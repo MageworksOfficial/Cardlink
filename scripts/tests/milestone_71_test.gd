@@ -1,0 +1,142 @@
+extends "res://scripts/tests/milestone_6b_test.gd"
+func run() -> void:
+	var base: String = OS.get_cmdline_user_args()[0]
+	root.size = Vector2i(1152,760)
+	root.gui_embed_subwindows = true
+	var main: Control = await create_client(base.path_join("cards"),"Knowledge fixture",Color.CORNFLOWER_BLUE)
+	var table: Node = main.tabletop
+	var c: Node = table.match_controller
+	check(c.playtest.mode == "online","Online Opponent remains default")
+	check(c.playtest.set_mode("local_playtest"),"Local playtest requires no connection")
+	var deck: Dictionary = preload("res://scripts/deck_storage.gd").new_deck()
+	deck.cards = [{"card_id":c.card_by_id(c.pile.order[0]).state.card_definition_id,"quantity":5}]
+	check(c.load_deck(deck,false,"opponent").get("count") == 5,"Independent opponent deck loads offline")
+	c.draw_card("local")
+	c.draw_card("opponent")
+	check(c.model.players.local.hand.size()==1 and c.model.players.opponent.hand.size()==1,"Both players draw independently offline")
+	c.playtest.player_picker.item_selected.emit(1)
+	check(c.hand.row.get_child_count()==1 and c.hand.row.get_child(0).texture==c.card_by_id(c.model.players.opponent.hand[0]).card_image.texture,"Local user can control and see opponent hand")
+	c.playtest.player_picker.item_selected.emit(0)
+	var card: Control = c.card_by_id(c.model.players.local.hand[0])
+	var id: String = card.state.match_instance_id
+	card.state.set_counter("test",3)
+	card.set_tapped(true)
+	c.toggle_hand_reveal(card)
+	var before: int = table.cards.size()
+	var hand: Control = c.hand
+	c.hand_window.open_hand()
+	await process_frame
+	check(c.hand_window.detached and c.hand.get_window()==c.hand_window.window,"Optional native hand window opens")
+	check(c.hand == hand and c.card_by_id(id)==card,"Detaching reparents same view and same instance")
+	check(not table.shortcuts.has_window(main),"Hand window does not block main camera/shortcuts")
+	c.hand_window.begin_drag(id)
+	c.hand_window.drag_origin = Vector2.ZERO
+	c.hand_window.finish_screen_drop(root.get_screen_transform()*Vector2(450,450),root.get_window_id())
+	check(card.state.current_zone=="battlefield" and table.cards.size()==before and c.card_by_id(id)==card,"Cross-window internal drag moves one existing instance")
+	check(card.state.owner_player_id=="local" and card.state.controller_player_id=="local" and card.state.counters.test==3 and card.state.tapped and card.state.custom_metadata.public_reveal,"Drag preserves identity, owner, controller, counters, tap and reveal")
+	check(c.hand_window.drop_to_hand(id) and card.state.current_zone=="hand","Battlefield can return into detached hand")
+	c.hand_window.window.close_requested.emit()
+	check(not c.hand_window.detached and c.hand==hand and c.hand.get_parent()==main,"Closing restores the same hand to main window")
+	var life: int = c.model.players.local.life
+	c.hearts.hearts.local.get_parent().get_child(2).pressed.emit()
+	check(c.model.players.local.life==life+1,"Heart plus changes life")
+	c.hearts.hearts.local.get_parent().get_child(0).pressed.emit()
+	check(c.model.players.local.life==life,"Heart minus changes life")
+	c.shuffle_library()
+	check(c.pile_view.back_image.texture==table.backs.texture(),"Hidden library top stays a back")
+	c.library_actions.put_nth(card,"local",1)
+	check(c.Knowledge.known(card.state,"local") and c.Knowledge.known(card.state,"opponent") and c.pile_view.back_image.texture==card.card_image.texture,"Revealed hand card enters library known to both")
+	c.library_actions.put_nth(card,"local",3)
+	check(c.pile.order[2]==id and c.library_rows("local")[2].known,"Known top moved third remains known")
+	c.library_actions.put_nth(card,"local",1,true)
+	check(c.pile.order.back()==id and c.library_rows("local").back().known,"Known third moved bottom remains known")
+	c.open_library_view()
+	check(c.contents_list.item_count==c.pile.order.size() and c.contents_list.get_item_icon(0)==table.backs.texture() and c.contents_list.get_item_icon(c.contents_list.item_count-1)==card.card_image.texture,"Normal viewer mixes faces and backs in exact order")
+	c.contents_list.item_selected.emit(0)
+	check(c.inspection_preview.texture==table.backs.texture(),"Selecting an unknown slot does not reveal it")
+	var order: Array = c.pile.order.duplicate()
+	c.close_inspection()
+	check(c.pile.order==order and c.Knowledge.known(card.state,"local"),"Normal view closes without shuffle or knowledge loss")
+	c.shuffle_library()
+	check(c.library_rows("local").all(func(row: Dictionary) -> bool: return not row.known),"Shuffle clears every library knowledge entry")
+	c.review.open_review("local",2,true)
+	var scried: String = c.review.top[0]
+	c.review.confirm_review()
+	check(c.Knowledge.known(c.card_by_id(scried).state,"local") and not c.Knowledge.known(c.card_by_id(scried).state,"opponent"),"Scry remembers identities only for inspecting player")
+	c.review.open_review("local",1,false)
+	c.review.cancel()
+	check(c.Knowledge.known(c.card_by_id(c.pile.order[0]).state,"opponent"),"Reveal Top N explicitly records shared knowledge")
+	c.open_inspection("local","library")
+	c.close_inspection()
+	check(c.library_rows("local").all(func(row: Dictionary) -> bool: return not row.known),"Unrestricted search closes with shuffle and forgets all knowledge")
+	c.review.open_review("local",1,true)
+	c.review.cancel()
+	c.hand_window.open_hand()
+	await process_frame
+	var saved: Dictionary = table.persistence.capture_match()
+	check(preload("res://scripts/match_snapshot.gd").validate(saved).is_empty(),"Detached/playtest/knowledge save is valid")
+	var known_id: String = c.pile.order[0]
+	c.shuffle_library()
+	check(table.persistence.restore_match(saved).get("restored",false),"Match restoration succeeds")
+	check(c.playtest.local_playtest() and c.hand_window.detached and c.Knowledge.known(c.card_by_id(known_id).state,"local"),"Mode, detached view and viewer-specific memory restored")
+	c.hand_window.restore_hand()
+	var key := InputEventKey.new()
+	key.pressed = true
+	key.keycode = KEY_S
+	table.shortcuts.handle_key(key)
+	check(c.library_rows("local").all(func(row: Dictionary) -> bool: return not row.known),"S shortcut clears knowledge")
+	var input := LineEdit.new()
+	main.add_child(input)
+	input.grab_focus()
+	var count: int = c.pile.order.size()
+	key.keycode = KEY_D
+	table.shortcuts.handle_key(key)
+	check(c.pile.order.size()==count,"Typing blocks draw shortcut")
+	input.release_focus()
+	input.queue_free()
+	for field: String in ["opponent_mode","hand_player","hand_detached","hand_position","remote_library_knowledge","remote_library_count"]: saved.local_tabletop.erase(field)
+	for row: Dictionary in saved.cards: row.custom_metadata.erase("library_known_to")
+	check(table.persistence.restore_match(saved).get("restored",false) and c.playtest.mode=="online" and not c.hand_window.detached,"Older saves receive safe mode/window defaults")
+	check(table.cards.size()==before,"No duplicate instance introduced by windows or restoration")
+	c.hand_window.open_hand()
+	key.keycode = KEY_X
+	c.hand_window.window_input(key)
+	check(not c.hand_window.window.visible,"X hides detached hand locally")
+	table.shortcuts.handle_key(key)
+	check(c.hand_window.window.visible,"X restores detached hand")
+	key.keycode = KEY_L
+	var editing: bool = table.layout.edit_mode
+	c.hand_window.window_input(key)
+	check(table.layout.edit_mode != editing,"L works from hand window")
+	c.hand_window.window_input(key)
+	key.keycode = KEY_D
+	count = c.pile.order.size()
+	c.hand_window.window_input(key)
+	check(c.pile.order.size()==count-1,"D draws from hand window")
+	var drawn: Control = c.card_by_id(c.model.players.local.hand.back())
+	table.select_card(drawn)
+	key.keycode = KEY_F
+	c.hand_window.window_input(key)
+	check(drawn.state.current_zone=="graveyard","F discards selected card from hand window")
+	var native_input := LineEdit.new()
+	c.hand_window.rows.add_child(native_input)
+	native_input.grab_focus()
+	count = c.pile.order.size()
+	key.keycode = KEY_D
+	c.hand_window.window_input(key)
+	check(c.pile.order.size()==count,"Typing in detached window blocks shortcuts")
+	native_input.release_focus()
+	native_input.queue_free()
+	c.hand_window.restore_hand()
+	if "capture" in OS.get_cmdline_user_args():
+		c.playtest.set_mode("local_playtest")
+		c.draw_card("local")
+		c.hand_window.open_hand()
+		await RenderingServer.frame_post_draw
+		root.get_texture().get_image().save_png(base.path_join("table.png"))
+		c.hand_window.window.get_texture().get_image().save_png(base.path_join("hand.png"))
+	c.hand_window.restore_hand()
+	main.queue_free()
+	await process_frame
+	print("CARDLINK 7.1 LOCAL: %d checks, %d failures" % [checks,failures])
+	quit(0 if failures==0 else 1)

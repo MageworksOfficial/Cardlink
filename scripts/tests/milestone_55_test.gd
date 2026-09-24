@@ -1,0 +1,240 @@
+extends SceneTree
+const Store = preload("res://scripts/card_storage.gd")
+const Loader = preload("res://scripts/library_loader.gd")
+const Decks = preload("res://scripts/deck_storage.gd")
+const Backs = preload("res://scripts/card_back_service.gd")
+const Pile = preload("res://scripts/library_pile.gd")
+const Snapshot = preload("res://scripts/match_snapshot.gd")
+var failures: int = 0
+var checks: int = 0
+func _initialize() -> void:
+	run.call_deferred()
+func check(value: bool, caption: String) -> void:
+	checks += 1
+	print("PASS: " if value else "FAIL: ", caption)
+	if not value:
+		failures += 1
+func press(point: Vector2, which: MouseButton, double: bool = false) -> InputEventMouseButton:
+	var event := InputEventMouseButton.new()
+	event.position = point
+	event.global_position = point
+	event.button_index = which
+	event.pressed = true
+	event.double_click = double
+	return event
+func run() -> void:
+	var base: String = OS.get_cmdline_user_args()[0] if not OS.get_cmdline_user_args().is_empty() else "user://cache/milestone55/" + Crypto.new().generate_random_bytes(8).hex_encode()
+	var cards_dir: String = base.path_join("cards")
+	root.size = Vector2i(1152, 760)
+	root.gui_embed_subwindows = true
+	var image := Image.create(750, 1050, false, Image.FORMAT_RGBA8)
+	image.fill(Color.CORNFLOWER_BLUE)
+	var store := Store.new(cards_dir)
+	var a: Dictionary = store.save_card(image.save_png_to_buffer(), "Azure secret", image.get_size())
+	image.fill(Color.CORAL)
+	var b: Dictionary = store.save_card(image.save_png_to_buffer(), "Coral secret", image.get_size())
+	var deck: Dictionary = Decks.new_deck()
+	deck.cards = [{"card_id": a.metadata.card_id, "quantity": 6}, {"card_id": b.metadata.card_id, "quantity": 6}]
+	var main: Control = preload("res://scripts/tests/table_fixture.gd").create_main()
+	root.add_child(main)
+	await process_frame
+	await process_frame
+	await process_frame
+	var table = main.tabletop
+	var c = table.match_controller
+	c.loader = Loader.new(cards_dir)
+	table.backs.directory = base.path_join("settings")
+	table.backs.reload()
+	check(table.backs.texture() != null and table.backs.selected_id == "cardlink", "Built-in original CardLink back loads")
+	c.load_deck(deck, false)
+	c.load_deck(deck, false, "opponent")
+	c.library_actions.draw_n("opponent", 5)
+	check(c.opponent_hand.cards_row.get_child_count() == 5 and c.opponent_hand.label.text.contains("5"), "Opponent hand renders exactly five backs and count")
+	var opponent: Control = c.card_by_id(c.model.players.opponent.hand[0])
+	var hidden: Control = c.opponent_hand.cards_row.get_child(0)
+	check(hidden.texture == table.backs.texture() and hidden.tooltip_text == "Hidden card" and not hidden.has_meta("card_id"), "Opponent presentation has no identity or IDs")
+	table.select_card(null)
+	hidden.mouse_entered.emit()
+	hidden.gui_input.emit(press(Vector2(10, 10), MOUSE_BUTTON_LEFT))
+	check(table.selected_card == null and not c.preview.visible, "Click and hover on opponent backs reveal nothing")
+	c.open_inspection("opponent", "hand", true)
+	check(c.contents_list.item_count == 5 and c.visibility.can_see(opponent.state, "local"), "Intentional opponent-hand inspection works")
+	c.contents_list.select(0)
+	c.contents_list.item_selected.emit(0)
+	check(c.inspection_preview.texture != null, "Inspection window shows chosen identity")
+	check(c.opponent_hand.cards_row.get_child(0).texture == table.backs.texture() and not opponent.state.identity_visible and table.controls.selected_label.text.contains("Hidden card"), "Inspection never exposes normal hand or selected-card identity")
+	c.show_preview(opponent)
+	check(not c.preview.visible, "Inspection grant cannot leak into normal hover preview")
+	c.close_inspection()
+	check(not c.visibility.can_see(opponent.state, "local") and c.inspection_preview.texture == null, "Closing inspection clears temporary access and texture")
+	c.move_card(opponent, "battlefield", true, "opponent")
+	opponent.set_face_down(true)
+	c.refresh()
+	check(opponent.visible and opponent.card_back.visible and opponent.card_back.texture == table.backs.texture(), "Face-down battlefield card renders default back")
+	opponent._on_mouse_entered()
+	check(not opponent.hover_preview.visible, "Face-down battlefield hover stays hidden")
+	var custom_path: String = base.path_join("my_back.png")
+	image.fill(Color(0.9, 0.1, 0.6, 0.2))
+	image.save_png(custom_path)
+	check(table.backs.import_custom(custom_path).is_empty(), "Custom card back imported")
+	var custom_id: String = table.backs.selected_id
+	check(opponent.card_back.texture == table.backs.texture() and c.opponent_hand.cards_row.get_child(0).texture == table.backs.texture() and c.pile_view.back_image.texture == table.backs.texture(), "Custom back updates battlefield, opponent hand and pile")
+	var reloaded = Backs.new(base.path_join("settings"))
+	check(reloaded.selected_id == custom_id and reloaded.texture().get_size() == Vector2(500, 700), "Custom selection survives settings reload")
+	check(is_equal_approx(reloaded.texture().get_image().get_pixel(250, 350).a, 1.0), "Transparent custom images become opaque backs")
+	check(not table.backs.import_custom(base.path_join("missing.png")).is_empty() and table.backs.selected_id == custom_id, "Invalid custom image preserves current preference")
+	check(table.backs.use_default().is_empty() and table.backs.selected_id == "cardlink", "Default back can be restored and saved")
+	check(table.backs.texture("future_unknown_back") == table.backs.texture(), "Unknown alternate back safely falls back")
+	check(table.world.size == Vector2(2304, 1296), "Larger logical battlefield is independent of window size")
+	var hand_position: Vector2 = c.hand.position
+	var toolbar_position: Vector2 = table.controls.position
+	var opponent_position: Vector2 = c.opponent_hand.position
+	var summary_position: Vector2 = table.life_display.position
+	table.view._input(press(Vector2(700, 280), MOUSE_BUTTON_WHEEL_UP))
+	check(table.view.zoom > 1, "Wheel up zooms battlefield")
+	table.view._input(press(Vector2(700, 280), MOUSE_BUTTON_WHEEL_DOWN))
+	check(is_equal_approx(table.view.zoom, 1.0), "Wheel down zooms out")
+	table.view.zoom_by(100)
+	check(table.view.zoom == 2.0, "Zoom maximum clamped to 200 percent")
+	table.view.zoom_by(0.0001)
+	check(table.view.zoom == 0.4, "Zoom minimum clamped to 40 percent")
+	var old_pan: Vector2 = table.view.pan
+	table.view._input(press(Vector2(700, 280), MOUSE_BUTTON_MIDDLE))
+	var motion := InputEventMouseMotion.new()
+	motion.relative = Vector2(80, -30)
+	table.view._input(motion)
+	var release := press(Vector2(700, 280), MOUSE_BUTTON_MIDDLE)
+	release.pressed = false
+	table.view._input(release)
+	check(table.view.pan == old_pan + Vector2(80, -30), "Pan uses screen movement while zoomed")
+	check(c.hand.position == hand_position and table.controls.position == toolbar_position and c.opponent_hand.position == opponent_position and table.life_display.position == summary_position, "Hand, opponent status and toolbar remain screen-fixed")
+	var before_zoom: float = table.view.zoom
+	table.view._input(press(table.controls.get_global_rect().get_center(), MOUSE_BUTTON_WHEEL_UP))
+	check(table.view.zoom == before_zoom, "Wheel over fixed toolbar does not zoom")
+	table.view.reset_view()
+	check(table.view.zoom >= 0.4 and table.view.zoom <= 0.8 and table.view.pan.y == 65, "Reset restores useful default view")
+	before_zoom = table.view.zoom
+	opponent._gui_input(press(Vector2(30, 40), MOUSE_BUTTON_RIGHT))
+	check(table.controls.panels.Card.visible and not opponent.dragging, "Right-click card opens Card Actions without dragging")
+	check(table.controls.card_target.get_selected_metadata() == "opponent", "Card context defaults to current zone player")
+	table.view._input(press(Vector2(700, 280), MOUSE_BUTTON_WHEEL_UP))
+	check(table.view.zoom == before_zoom, "Context window blocks battlefield wheel zoom")
+	table.controls.close_panels()
+	var library_before: Array = c.model.players.opponent.library.order.duplicate()
+	c.opponent_pile._gui_input(press(Vector2(20, 30), MOUSE_BUTTON_LEFT, true))
+	check(table.controls.panels.Library.visible and table.controls.deck_target.get_selected_metadata() == "opponent", "Double-click opponent library opens targeted Library Actions")
+	check(c.model.players.opponent.library.order == library_before, "Opening library actions does not draw a card")
+	table.controls.close_panels()
+	var pile_press := press(Vector2(20, 30), MOUSE_BUTTON_LEFT)
+	var pile_release := press(Vector2(20, 30), MOUSE_BUTTON_LEFT)
+	pile_release.pressed = false
+	c.opponent_pile._gui_input(pile_press)
+	c.opponent_pile._gui_input(pile_release)
+	await create_timer(0.6).timeout
+	check(c.model.players.opponent.library.order.size() == library_before.size() - 1, "Single-click pile draws after double-click interval")
+	library_before = c.model.players.opponent.library.order.duplicate()
+	c.opponent_pile._gui_input(pile_press)
+	c.opponent_pile._gui_input(pile_release)
+	c.opponent_pile._gui_input(press(Vector2(20, 30), MOUSE_BUTTON_LEFT, true))
+	await create_timer(0.6).timeout
+	check(c.model.players.opponent.library.order == library_before, "Double-click cancels pending single-click draw")
+	table.controls.close_panels()
+	var id: String = opponent.state.match_instance_id
+	c.library_actions.put_nth(opponent, "local", 1)
+	check(c.pile.order[0] == id, "Top insertion")
+	c.library_actions.put_nth(opponent, "local", 1, true)
+	check(c.pile.order.back() == id, "Bottom insertion")
+	c.library_actions.put_nth(opponent, "local", 3)
+	check(c.pile.order[2] == id and c.pile.order.count(id) == 1, "Third from top uses index two without duplication")
+	c.library_actions.put_nth(opponent, "local", 3, true)
+	check(c.pile.order[c.pile.order.size() - 3] == id, "Third from bottom indexes correctly")
+	c.library_actions.put_nth(opponent, "opponent", 9999)
+	check(c.model.players.opponent.library.order.back() == id and not c.pile.order.has(id) and opponent.state.owner_player_id == "opponent", "Cross-player insertion clamps and preserves owner")
+	var hand_before: int = c.model.players.local.hand.size()
+	check(c.library_actions.draw_n("local", 3) == 3 and c.model.players.local.hand.size() == hand_before + 3, "Draw N moves correct copies into hand")
+	var to_mill: Array[String] = c.pile.peek(2)
+	check(c.library_actions.mill_n("local", 2) == 2 and c.model.players.local.graveyard.has(to_mill[0]) and c.model.players.local.graveyard.has(to_mill[1]), "Mill N moves top copies to graveyard")
+	var order_before: Array[String] = c.pile.order.duplicate()
+	c.review.open_review("local", 3)
+	check(c.review.visible and c.review.top_list.item_count == 3 and c.review.preview.texture != null, "Scry N shows top N in temporary review")
+	c.review.top_list.select(0)
+	c.review.reorder(1)
+	check(c.review.top[0] == order_before[1] and c.pile.order == order_before, "Scry reorders draft without mutating library")
+	c.review.top_list.select(1)
+	c.review.to_bottom()
+	var expected: Array[String] = [order_before[1], order_before[2]]
+	expected.append_array(order_before.slice(3))
+	expected.append(order_before[0])
+	c.review.confirm_review()
+	check(c.pile.order == expected and not c.review.visible, "Scry confirm preserves rest and moves selected to bottom")
+	check(c.review.top.is_empty() and c.review.preview.texture == null, "Scry close clears all inspected identities")
+	order_before = c.pile.order.duplicate()
+	c.review.open_review("local", 3)
+	c.review.top_list.select(0)
+	c.review.to_bottom()
+	c.review.cancel()
+	check(c.pile.order == order_before, "Cancel Scry leaves original order intact")
+	c.review.open_review("local", 3)
+	c.draw_card()
+	order_before = c.pile.order.duplicate()
+	c.review.confirm_review()
+	check(c.review.visible and c.pile.order == order_before and c.review.status.text.contains("changed"), "Stale Scry refuses to overwrite changed library")
+	c.review.cancel()
+	var opponent_before: Array[String] = c.model.players.opponent.library.order.duplicate()
+	c.review.open_review("opponent", 2, false)
+	check(c.review.top_list.item_count == 2 and c.review.preview.texture != null and not c.review.confirm_button.visible, "Reveal Top N inspects opponent library only in review")
+	check(c.opponent_pile.back_image.texture == c.card_by_id(opponent_before[0]).card_image.texture and not c.card_by_id(opponent_before[0]).state.identity_visible, "Reveal Top N records known top without exposing physical hidden instances")
+	c.review.cancel()
+	check(c.model.players.opponent.library.order == opponent_before and c.visibility.inspection_ids.is_empty(), "Closing Reveal Top N preserves order and grants no lingering access")
+	var source: Control = c.card_by_id(c.model.players.local.hand[0])
+	c.move_card(source, "battlefield")
+	source.set_tapped(true)
+	source.state.set_counter("Charge", 3)
+	var token: Control = c.library_actions.duplicate_token(source).card
+	check(token.state.is_token and token.state.match_instance_id != source.state.match_instance_id and token.state.owner_player_id == source.state.owner_player_id, "Duplicate as Token preserves owner with new identity")
+	source.set_face_down(true)
+	c.refresh()
+	var concealed: Control = c.library_actions.duplicate_token(source).card
+	check(concealed.card_back.visible and not concealed.token_label.visible, "Duplicating hidden card as token does not expose its name or art")
+	var snapshot: Dictionary = table.persistence.capture_match()
+	check(Snapshot.validate(snapshot).is_empty(), "New operations leave valid serializable match state")
+	check(not table.persistence.restore_match(snapshot).has("error") and c.pile.order == snapshot.players[0].library_order, "Ordered operations survive full match restoration")
+	c.library_actions.draw_n("opponent", 999)
+	check(c.model.players.opponent.library.order.is_empty(), "Draw N beyond library size stops safely")
+	check(c.library_actions.draw_n("opponent", 2) == 0 and c.library_actions.mill_n("opponent", 2) == 0, "Empty Draw and Mill are safe")
+	c.review.open_review("opponent", 5)
+	c.review.confirm_review()
+	check(not c.review.visible, "Scry on empty library is safe")
+	check(table.controls.panels.size() == 9 and not c.toolbar.visible, "Nine-item compact toolbar preserved")
+	var card_for_actions: Control = table.cards[0]
+	table.select_card(card_for_actions)
+	table.controls.card_target.select(1)
+	table.controls.context_actions.move_selected("hand", table.controls.card_target)
+	check(card_for_actions.state.current_zone == "hand" and card_for_actions.state.zone_player_id == "opponent", "Card Action dispatch moves to selected player's hand")
+	table.controls.context_actions.move_selected("battlefield", table.controls.card_target)
+	table.controls.context_actions.set_hidden(true)
+	check(card_for_actions.card_back.visible, "Card Action Hide applies card-back presentation")
+	table.controls.context_actions.set_hidden(false)
+	check(not card_for_actions.card_back.visible, "Card Action Reveal restores public face")
+	var tiny := Pile.new()
+	tiny.insert_nth("a", 99, true)
+	tiny.insert_nth("b", 1, true)
+	tiny.insert_nth("b", 2, true)
+	check(tiny.order == ["b", "a"], "Indexed insertion handles empty pile and existing member at either boundary")
+	if OS.get_cmdline_user_args().size() > 1:
+		root.size = Vector2i(1152, 760)
+		table.controls.close_panels()
+		await process_frame
+		await RenderingServer.frame_post_draw
+		root.get_texture().get_image().save_png(base.path_join("milestone55_tabletop.png"))
+		c.review.open_review("local", 3)
+		await process_frame
+		await RenderingServer.frame_post_draw
+		root.get_texture().get_image().save_png(base.path_join("milestone55_scry.png"))
+		c.review.cancel()
+		table.controls.open_library_actions("opponent")
+		await process_frame
+		await RenderingServer.frame_post_draw
+		root.get_texture().get_image().save_png(base.path_join("milestone55_library_actions.png"))
+	print("MILESTONE 5.5 COMPLETE: checks=", checks, " failures=", failures)
+	quit(1 if failures else 0)

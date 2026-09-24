@@ -1,0 +1,82 @@
+[
+  {
+    "file": "background/background_tabletop_reconstructed.png",
+    "width": 1672,
+    "height": 941,
+    "alpha_channel": false,
+    "method": "AI-assisted reconstruction from flattened source",
+    "sha256": "61e34991ba436b58e09a206fe128106f5cb203f34e8e4bb386a42583a630290c"
+  },
+  {
+    "file": "ui/cardlink_title.png",
+    "width": 2162,
+    "height": 727,
+    "alpha_channel": true,
+    "method": "AI-assisted reconstruction from flattened source",
+    "sha256": "51828ee903e3073d0e5c8753fb1addfe50c415af15df055be08b8a7d38e08007"
+  },
+  {
+    "file": "ui/online_mode_panel.png",
+    "width": 1649,
+    "height": 954,
+    "alpha_channel": true,
+    "method": "AI-assisted reconstruction from flattened source",
+    "sha256": "b1ca2dc74907479ed9ac6689c42aa40f3cd877549bd748a84f5928e87bff6b86"
+  },
+  {
+    "file": "ui/offline_mode_panel.png",
+    "width": 1774,
+    "height": 887,
+    "alpha_channel": true,
+    "method": "AI-assisted reconstruction from flattened source",
+    "sha256": "7b4d8c8132ec9cd79294dab80616d25527828b7a2f398b20a79cfaa3d1ebd28a"
+  },
+  {
+    "file": "ui/settings_button.png",
+    "width": 2164,
+    "height": 727,
+    "alpha_channel": true,
+    "method": "AI-assisted reconstruction from flattened source",
+    "sha256": "a2dfae723a5be5148d63ce6d69164a9d5e6f9acc16f9c2cdb58ca7f3147ee9aa"
+  },
+  {
+    "file": "ui/exit_button.png",
+    "width": 2121,
+    "height": 741,
+    "alpha_channel": true,
+    "method": "AI-assisted reconstruction from flattened source",
+    "sha256": "5a78b17bf8991a95ee3d0c8bd73b1d3744e8c00befd4935d64dfc4c49d0ef02d"
+  },
+  {
+    "file": "icons/icon_settings_gear.png",
+    "width": 1254,
+    "height": 1254,
+    "alpha_channel": true,
+    "method": "AI-assisted reconstruction from flattened source",
+    "sha256": "d925fd06607e686ae10ba6d661abfffa462cd912881a1cf975294217e03179df"
+  },
+  {
+    "file": "icons/icon_exit_door.png",
+    "width": 1254,
+    "height": 1254,
+    "alpha_channel": true,
+    "method": "AI-assisted reconstruction from flattened source",
+    "sha256": "28440fc319fde3f3bddc28b1b300a17f7e4e84802f6d5b28e0d3e0ba4c5bde26"
+  },
+  {
+    "file": "icons/icon_player_blue.png",
+    "width": 1254,
+    "height": 1254,
+    "alpha_channel": true,
+    "method": "AI-assisted reconstruction from flattened source",
+    "sha256": "a57a28e621d9fd7d4951f5bb2f804f8cfc47f3dec9472b0d74e884c8e3477d16"
+  },
+  {
+    "file": "icons/icon_network_globe.png",
+    "width": 1254,
+    "height": 1254,
+    "alpha_channel": true,
+    "method": "AI-assisted reconstruction from flattened source",
+    "sha256": "632a838c7ae74650d84df3861db48f2eb9e4acf7d0af8f28241c647e4d857009"
+  }
+]

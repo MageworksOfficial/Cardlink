@@ -1,0 +1,37 @@
+[Unit]
+Description=CardLink rendezvous and validated relay
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=cardlink
+Group=cardlink
+WorkingDirectory=/opt/cardlink
+EnvironmentFile=/etc/cardlink/service.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -u /opt/cardlink/cardlink_service.py
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+LimitNOFILE=512
+LimitCORE=0
+MemoryMax=384M
+MemorySwapMax=0
+TasksMax=64
+UMask=0077
+LogNamespace=cardlink
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=100
+
+[Install]
+WantedBy=multi-user.target

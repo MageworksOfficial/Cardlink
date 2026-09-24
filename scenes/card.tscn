@@ -1,0 +1,31 @@
+[gd_scene format=3 uid="uid://x1tqhhdxh53"]
+
+[ext_resource type="Script" uid="uid://dm1atfi10ou48" path="res://scenes/card.gd" id="1_d81rb"]
+[ext_resource type="Texture2D" uid="uid://b854dhn3lx8rl" path="res://icon.svg" id="2_6u4wf"]
+
+[node name="Card" type="Control" unique_id=1298602875]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 250.0
+offset_bottom = 350.0
+script = ExtResource("1_d81rb")
+
+[node name="CardImage" type="TextureRect" parent="." unique_id=1292806073]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_6u4wf")
+expand_mode = 1
+
+[node name="HoverPreview" type="TextureRect" parent="." unique_id=1481963524]
+layout_mode = 0
+offset_left = 270.0
+offset_right = 645.0
+offset_bottom = 525.0
+mouse_filter = 2
+texture = ExtResource("2_6u4wf")
+expand_mode = 1

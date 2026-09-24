@@ -1,0 +1,52 @@
+{
+  "tool": "built-in image_gen.imagegen",
+  "background": "Use case: precise-object-edit. Edit target: attached CardLink title screen. Produce ONE clean 1672x941 or same aspect ratio background/tabletop image for a Godot title screen. Remove ALL overlaid UI: large CARDLINK logo, circular logo reticle, subtitle, Online Mode and Offline Mode panels, Settings and Exit buttons, all small corner/side text and version text. Reconstruct the concealed dark blue sci-fi room and tabletop naturally. Preserve original camera, palette, lighting, side display cards, foreground card stacks and glowing ellipse/star built into the tabletop. No words, no interface panels. Preserve existing visible environment as closely as possible. This is an inpainted reconstruction of covered areas.",
+  "ui": {
+    "prefix": "Use case: background-extraction. Edit target: supplied CardLink title screen. Create one reusable Godot PNG asset on a genuinely transparent alpha background, not a checkerboard painted into the image. ",
+    "assets": [
+      [
+        "cardlink_title",
+        "Isolate the entire main CARDLINK title area ONLY, including silver-blue CARDLINK lettering, blue circular compass/reticle behind it, subtitle 'A TABLETOP CARD SANDBOX' and its short flanking blue lines. Preserve precise typography, spacing, proportions, metallic highlights and glow. Exclude everything else."
+      ],
+      [
+        "online_mode_panel",
+        "Isolate ONLY the complete left ONLINE MODE panel, preserving its clipped-corner cyan frame, dark navy interior, world map, two blue player icons and connecting globe, title 'ONLINE MODE' and subtitle 'PLAY WITH OTHERS AROUND THE WORLD'. Preserve layout and text exactly. Everything outside panel transparent."
+      ],
+      [
+        "offline_mode_panel",
+        "Isolate ONLY the complete right OFFLINE MODE panel, preserving clipped-corner cyan frame, dark navy interior, two player icons (left blue, right pale silver) with three cards between, title 'OFFLINE MODE' and subtitle 'Offline playtest — simulates both players as if connected.'. Preserve layout and text exactly. Everything outside panel transparent."
+      ],
+      [
+        "settings_button",
+        "Isolate ONLY the small SETTINGS button from bottom center-left, with its clipped-corner thin cyan outline, dark navy fill, gear icon and 'SETTINGS' text. Preserve exact appearance and proportions. Everything outside button transparent."
+      ],
+      [
+        "exit_button",
+        "Isolate ONLY the small EXIT button from bottom center-right, with clipped-corner thin cyan outline, dark navy fill, door/arrow icon and 'EXIT' text. Preserve exact appearance and proportions. Everything outside button transparent."
+      ]
+    ],
+    "suffix": " Tight fitting landscape canvas with small padding for the glow. Extract faithfully without redesign, do not add new elements. Keep all original interior details. Output one asset only."
+  },
+  "icons": {
+    "prefix": "Use case: background-extraction. Isolate ONLY ",
+    "assets": [
+      [
+        "icon_settings_gear",
+        "the pale blue gear icon inside the Settings button"
+      ],
+      [
+        "icon_exit_door",
+        "the pale blue outlined door and right-pointing arrow icon inside the Exit button"
+      ],
+      [
+        "icon_player_blue",
+        "one blue player bust icon (circle head and rounded shoulder silhouette) from the Online Mode panel"
+      ],
+      [
+        "icon_network_globe",
+        "the glowing cyan wireframe globe icon from the center of the Online Mode panel"
+      ]
+    ],
+    "suffix": " from this edit target. Output one standalone reusable UI icon PNG, genuinely transparent alpha background. Preserve the exact icon design, cool blue palette and subtle glow. Center on tight square canvas with modest padding. No panel, no text, no other icons, no backdrop or checkerboard. Faithful extraction without redesign."
+  }
+}

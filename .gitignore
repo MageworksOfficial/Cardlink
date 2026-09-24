@@ -1,0 +1,88 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# Generated builds and caches; preserve source assets and import settings.
+/build/
+/builds/
+/exports/
+/output/
+/logs/
+*.log
+*.exe
+*.pck
+*.zip
+*.dmg
+*.app/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+export_credentials.cfg
+# Personal runtime directories (not the source cards/assets/data directories).
+/user_data/
+/matches/
+/recovery/
+/scryfall_cache/
+/test-output/
+/cardlink-test-*/
+# Legacy local image fixtures: exact paths, retained on disk.
+/cards/10.png
+/cards/10.png.import
+/cards/11.png
+/cards/11.png.import
+/cards/12.png
+/cards/12.png.import
+/cards/13.png
+/cards/13.png.import
+/cards/6.png
+/cards/6.png.import
+/cards/7.png
+/cards/7.png.import
+/cards/8.png
+/cards/8.png.import
+/cards/9.png
+/cards/9.png.import
+/cards/card 1.png
+/cards/card 1.png.import
+/cards/card 3.png
+/cards/card 3.png.import
+/cards/card 4.png
+/cards/card 4.png.import
+/cards/card 5.png
+/cards/card 5.png.import
+/cards/file_000000002190822fa546b1c1a6ee8ed4.png
+/cards/file_000000002190822fa546b1c1a6ee8ed4.png.import
+/cards/Forest.png
+/cards/Forest.png.import
+/cards/Island.png
+/cards/Island.png.import
+/cards/mountian.png
+/cards/mountian.png.import
+/cards/plains.png
+/cards/plains.png.import
+/cards/Swamp.png
+/cards/Swamp.png.import
+
+# Reference/provenance files and historical local reports require private review.
+/assets/title_screen/reference/
+/SERVER_UPDATE_7_7/
+/GITHUB_PREP_AUDIT.md
+/CARDLINK_*_REPORT.md
+/MILESTONE_*.md
+/PATCH_*.md
+/TAILSCALE*.md
+/PLAYER_GUIDE_*.md
+/START_HERE.md
+
+/DEPLOYMENT_7.md
+/PRODUCTION_CLIENT.md
+/INTERNET_ACCEPTANCE_7.md
+/SYNC_CARDS_FIX.md
