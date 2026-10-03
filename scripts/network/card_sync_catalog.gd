@@ -31,7 +31,24 @@ static func images(row: Dictionary) -> Array:
 	for face: Dictionary in row.get("faces",[]):
 		if not face.hash in result: result.append(face.hash)
 	return result
-func asset_path(hash: String) -> String: return directory.path_join(hash + ".png")
+func asset_path(hash: String) -> String:
+	var canonical: String = directory.path_join(hash + ".png")
+	if FileAccess.file_exists(canonical): return canonical
+	# Legacy collections can retain a different local filename. Reuse only a
+	# bounded, hash-verified image referenced inside this collection directory.
+	for record: Dictionary in records:
+		var candidates: Array = [record]
+		if record.get("faces") is Array: candidates.append_array(record.faces)
+		for face: Variant in candidates:
+			if not face is Dictionary or face.get("image_hash") != hash or not face.get("image_path") is String: continue
+			var path: String = face.image_path
+			if path.contains("..") or ProjectSettings.globalize_path(path).get_base_dir().simplify_path() != ProjectSettings.globalize_path(directory).simplify_path(): continue
+			var file := FileAccess.open(path,FileAccess.READ)
+			if file == null: continue
+			var length: int = file.get_length()
+			file.close()
+			if length <= Wire.MAX_IMAGE and FileAccess.get_sha256(path) == hash: return path
+	return canonical
 func has_image(hash: String) -> bool:
 	if not Wire.hash_ok(hash): return false
 	var path: String = asset_path(hash)
@@ -41,7 +58,7 @@ func has_image(hash: String) -> bool:
 	var length: int = file.get_length()
 	file.close()
 	if length > Wire.MAX_IMAGE: return false
-	var stamp: String = str(FileAccess.get_modified_time(path)) + ":" + str(length)
+	var stamp: String = path + ":" + str(FileAccess.get_modified_time(path)) + ":" + str(length)
 	if verified.get(hash) == stamp: return true
 	if FileAccess.get_sha256(path) != hash: return false
 	# Existing content-addressed assets were validated by import/receive. Recheck their hash/header natively.

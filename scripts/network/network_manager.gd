@@ -47,7 +47,7 @@ var closing: bool = false
 var close_state: String = "disconnected"
 var close_status: String = "Disconnected."
 func log_event(text: String) -> void:
-	debug_log.append(Time.get_time_string_from_system() + " Â· " + text)
+	debug_log.append(Time.get_time_string_from_system() + " | " + text)
 	if debug_log.size() > 200:
 		debug_log.pop_front()
 	log_changed.emit()
@@ -63,7 +63,7 @@ func valid_start(port: int, caption: String) -> bool:
 	if not available():
 		return false
 	if port < 1024 or port > 65535 or not Codec.safe_text(caption.strip_edges(), 48):
-		state("error", "Enter a name (1â€“48 characters) and a port from 1024 to 65535.")
+		state("error", "Enter a name (1-48 characters) and a port from 1024 to 65535.")
 		log_event("Connection error: invalid connection settings.")
 		return false
 	return true
@@ -305,7 +305,7 @@ func disconnect_session() -> void:
 		control("bye")
 		begin_close("disconnected", "Disconnected. Local play is available.")
 	else:
-		state("disconnecting", "Disconnectingâ€¦")
+		state("disconnecting", "Disconnecting...")
 		cleanup()
 		state("disconnected", "Disconnected. Local play is available.")
 	log_event("Local disconnect requested.")

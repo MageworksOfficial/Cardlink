@@ -27,7 +27,8 @@ func sync() -> Node: return panel.gameplay.card_sync
 func connected() -> bool: return panel.network.session.state == "connected"
 func _ready() -> void:
     sync().changed.connect(func() -> void:
-        if sync().running or sync().requested: was_syncing = true)
+        if sync().running or sync().requested: was_syncing = true
+        inspection_key = "")
 func build_ui(parent: Node) -> void:
     primary = panel.button(parent,"SYNC MISSING CARDS",start_sync)
     progress = panel.label(parent,"Choose a deck and connect to play.")
@@ -132,7 +133,8 @@ func _process(delta: float) -> void:
     if busy: progress.text = "Syncing card images... %d%%\n%d / %d items verified. Keep playing." % [int(bar.value),s.work.completed(),s.work.total()]
     elif cancelled and missing: progress.text = "Sync cancelled. %d cards missing locally. You can keep playing." % need.missing
     elif not s.last_failure.is_empty(): progress.text = "Sync paused. Retry Missing when ready. You can keep playing."
-    elif missing: progress.text = "%d cards missing locally (%d images).\nOpponent needs %d cards. You can start playing now." % [need.missing,need.images.size(),peer_missing]
+    elif not s.checked: progress.text = "Checking remote card definitions and artwork..."
+    elif missing: progress.text = "%d cards missing locally (%d definitions, %d images).\nOpponent needs %d cards. Start Match uses placeholders until Card Sync finishes." % [need.missing,need.definitions.size(),need.images.size(),peer_missing]
     else: progress.text = "Cards ready"
     if not match_ready: progress.text = "Choose a deck. Waiting for opponent's deck..."
     hud.visible = panel.gameplay.enabled and (busy or missing) and not panel.window.visible

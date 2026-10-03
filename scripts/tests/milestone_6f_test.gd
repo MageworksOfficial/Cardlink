@@ -33,7 +33,7 @@ func run() -> void:
 	var guest: Node = make_client()
 	await host.host_room("Host")
 	check(host.active and host.valid_code(host.code), "Automatic host creates a short room code")
-	check(host.diagnostics.service.contains("✓") and host.diagnostics.internet.contains("Local"), "Diagnostics honestly distinguish local service from internet reachability")
+	check(host.diagnostics.service.contains("OK") and host.diagnostics.internet.contains("Local"), "Diagnostics honestly distinguish local service from internet reachability")
 	var room_code: String = host.code
 	var lookup: Dictionary = await guest.signaling.call_service("lookup", {"code": room_code})
 	check(lookup.get("state") == "waiting", "Room lookup verifies waiting host")
@@ -64,7 +64,7 @@ func run() -> void:
 	guest.config.set_value("internet", "direct_attempt_seconds", 0.3)
 	await guest.join_room(host.code, "Guest")
 	check(await wait_for(func() -> bool: return host.was_connected and guest.was_connected), "Blocked direct connection automatically establishes relay handshake")
-	check(host.method == "Relay" and guest.method == "Relay" and guest.diagnostics.relay.contains("✓"), "Relay success reported only after real peer handshake")
+	check(host.method == "Relay" and guest.method == "Relay" and guest.diagnostics.relay.contains("OK"), "Relay success reported only after real peer handshake")
 	check(host.network.session.session_id == guest.network.session.session_id and not host.session_id.is_empty(), "Relay carries matching safe session identity")
 	host.cancel()
 	await wait_for(func() -> bool: return not guest.active and host.network.available() and guest.network.available())

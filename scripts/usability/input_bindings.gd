@@ -5,7 +5,7 @@ const ACTIONS = {
 	"background_edit":["Background Edit Mode",KEY_B | KEY_MASK_CTRL,"View"],
 	"play_top":["Top card to battlefield",KEY_D | KEY_MASK_CTRL,"Gameplay"],
 	"draw":["Draw",KEY_D,"Gameplay"], "discard":["Discard selected hand card",KEY_F,"Gameplay"],
-	"shuffle":["Shuffle",KEY_S,"Gameplay"], "token":["Create / Duplicate Token",KEY_T,"Gameplay"],
+	"shuffle":["Shuffle",KEY_S,"Gameplay"], "token":["Create / Duplicate Token",KEY_Q,"Gameplay"],
 	"counter":["Counter Action",KEY_C,"Gameplay"], "graveyard":["Open / Move to Graveyard",KEY_G,"Gameplay"],
 	"exile":["Open / Move to Exile",KEY_E,"Gameplay"], "end_turn":["End Turn",KEY_N,"Gameplay"],
 	"delete":["Delete Selected",KEY_DELETE,"Gameplay"], "undo":["Undo",KEY_Z | KEY_MASK_CTRL,"Gameplay"],
@@ -17,7 +17,7 @@ const ACTIONS = {
 	"history":["Match History",KEY_M,"Interface"], "save":["Save Match",KEY_S | KEY_MASK_CTRL,"Interface"],
 	"table_builder":["Toggle Table Builder",0,"Interface"],
 	"mode":["Online / Playtest",KEY_P,"Interface"],
-	"tap":["Tap / Untap Selected",KEY_Q,"Gameplay"], "perspective":["Switch Offline Perspective",KEY_V,"View"], "card_face":["Change Card Face",0,"Gameplay"]}
+	"tap":["Tap / Untap Selected",KEY_T,"Gameplay"], "perspective":["Switch Offline Perspective",KEY_V,"View"], "card_face":["Change Card Face",0,"Gameplay"]}
 var path: String
 var keys: Dictionary = {}
 func _init(file: String = "user://input_bindings.cfg") -> void:
@@ -28,6 +28,10 @@ func _init(file: String = "user://input_bindings.cfg") -> void:
 		for id: String in ACTIONS:
 			var value: Variant = config.get_value("keys",id,keys[id])
 			if value is int and value >= 0: keys[id] = value
+	# Migrate the old stock pair together; retain deliberately customized bindings.
+	if keys.tap == KEY_Q and keys.token == KEY_T:
+		keys.tap = KEY_T
+		keys.token = KEY_Q
 	# Upgrade the previous default while retaining other custom bindings.
 	if keys.reset_match == (KEY_R | KEY_MASK_CTRL | KEY_MASK_ALT):
 		keys.reset_match = ACTIONS.reset_match[1]

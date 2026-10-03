@@ -1,6 +1,6 @@
-# CardLink 7 V0.8.5.1 Beta — Player Guide
+# CardLink 7 V0.8.5.2 Beta — Player Guide
 
-Text companion to the approved 50-page CardLink 7 V0.8.5.1 Beta Player Guide. The release PDF includes the screenshots and page layout; this Markdown preserves the same player instructions.
+Text companion to the approved 50-page CardLink 7 V0.8.5.2 Beta Player Guide. The release PDF includes the screenshots and page layout; this Markdown preserves the same player instructions.
 
 ## 01. Player Guide
 
@@ -9,7 +9,7 @@ A Free & Open-Source Tabletop Card Sandbox
 Screenshot: title-fresh.png —
 
 
-> CardLink 7 V0.8.5.1 Beta
+> CardLink 7 V0.8.5.2 Beta
 
 ## 02. Welcome to your table
 
@@ -55,7 +55,7 @@ Keep | Release documentation and third-party notices
 
 The title screen keeps the two ways into CardLink easy to find.
 
-Screenshot: title-fresh.png — Current V0.8.5.1 title screen.
+Screenshot: title-fresh.png — Current V0.8.5.2 title screen.
 
 1. ONLINE MODE opens the path to connecting with another player. You can use a room code or Advanced LAN/IP.
 2. OFFLINE MODE opens local play and preparation. Build a collection, make a deck or try a custom table without a server.
@@ -247,7 +247,7 @@ Card Actions lets you change a piece’s presentation without automating its rul
 
 Screenshot: card-actions.png — Card Actions includes tap, movement, face and counter controls; scroll for more actions.
 
-1. Select a battlefield card and press Q, or double-click the card, to toggle Tap / Untap.
+1. Select a battlefield card and press T, or double-click the card, to toggle Tap / Untap.
 2. Right-click to open Card Actions. Use Reveal or Hide / Face Down as appropriate for your game.
 3. A revealed library top uses its card face. A hidden top uses the selected back. Shuffling removes public reveal state from that library.
 
@@ -288,7 +288,7 @@ Tokens are independent battlefield objects, with their own name, art and control
 
 Screenshot: token.png — Creating an original Scout Token with 2 power and 2 toughness.
 
-1. Right-click empty battlefield space and choose Create Token, or use T when appropriate. Enter a name and optional power/toughness.
+1. Right-click empty battlefield space and choose Create Token, or use Q when appropriate. Enter a name and optional power/toughness.
 2. Choose an optional image, owner and controller, then create it. Double-click the token to open its properties and revise name, stats or art.
 3. Use Duplicate Token to copy its appearance and values as a new match instance. Move or edit the duplicate independently.
 
@@ -583,15 +583,15 @@ Screenshot: templates.png — My Tables and import controls; an empty personal t
 
 ## 46. Keyboard quick reference
 
-These are the V0.8.5.1 defaults. Check Settings → Key Bindings if you have changed them.
+These are the V0.8.5.2 defaults. Check Settings → Key Bindings if you have changed them.
 
 
 Key | Action
 --- | ---
 D / Ctrl+D | Draw / top library card to battlefield
 F / S | Discard selected local-hand card / shuffle
-Q / N | Tap or untap selected / End Turn
-T / C | Create or duplicate token / counter action
+T / N | Tap or untap selected / End Turn
+Q / C | Create or duplicate token / counter action
 G / E | Open or move to Graveyard / Exile
 Delete | Card → owner’s graveyard; token/counter → remove
 X / H / B | Show or hide hands / open Hand / open Library
@@ -650,7 +650,7 @@ Screenshot: title-fresh.png — Your feedback helps turn a flexible prototype in
 ## 50. Credits & license
 
 CardLink · Vex Mageworks
-CardLink 7 V0.8.5.1 Beta
+CardLink 7 V0.8.5.2 Beta
 
 1. CardLink-owned code and assets the project has the right to license use the GNU General Public License v3.0 (GPL-3.0). Read LICENSE for the full terms.
 2. Built with Godot Engine, under its MIT license and component notices. See the included THIRD_PARTY_NOTICE and project credits.

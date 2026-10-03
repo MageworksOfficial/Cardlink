@@ -1,3 +1,7 @@
+## CardLink 7 V0.8.5.2 Beta - Emergency hotfix candidate
+
+Restores action sequencing after a rejected online edit, refreshes Card Sync after collection changes, corrects connection text, and uses T for Tap / Untap and Q for Token. Ctrl+Z remains offline Undo. Deck backs remain separate from alternate card faces. Human two-PC acceptance is required before publication.
+
 ## CardLink 7 V0.8.5.1 Beta — Independent update checks
 
 The title screen now checks a separately configured Update Service without delaying startup. Click the corner version/status area for update details; Reduce Motion disables its gentle pulse. Recent metadata is cached, and stale required-update responses cannot block online indefinitely during an outage. Offline remains available.

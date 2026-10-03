@@ -54,7 +54,14 @@ func _ready() -> void:
 	router.network.card_sync_received.connect(receive)
 	live_assets = preload("res://scripts/network/live_card_assets.gd").new()
 	live_assets.service = self
+	preload("res://scripts/collection_events.gd").shared.collection_changed.connect(collection_changed)
 	add_child(live_assets)
+func collection_changed(directory: String) -> void:
+	if catalog == null or preload("res://scripts/collection_events.gd").key(catalog.directory) != directory or not pending or running or requested: return
+	catalog.reload()
+	# Deferred storage notifications also arrive after our own transfers.
+	# Refresh only changed discovery, preserving a completed transfer summary.
+	if inspect_required() != need: check_ready()
 func host() -> bool: return router.is_host()
 func note(message: String) -> void:
 	events.append(message)
@@ -273,7 +280,7 @@ func receive(frame: Dictionary) -> void:
 		remote_availability = frame.data.duplicate(true)
 		checked = have_remote and catalog != null and not need.is_empty()
 		note("Peer availability received: %d available, %d missing definitions, %d missing images." % [frame.data.available,frame.data.definitions,frame.data.images])
-		if not running and not requested: show_availability()
+		if not running and not requested and (not status.begins_with("CARD SYNC COMPLETE") or int(frame.data.missing) > 0 or int(need.get("missing",0)) > 0): show_availability()
 		return
 	if frame.kind == "begin":
 		if host() or running or choice.is_empty(): return
@@ -447,6 +454,7 @@ func advance() -> void:
 		running = false
 		choice = ""
 		remote_choice = ""
+		need = inspect_required()
 		if background_mode:
 			check_ready()
 			work.finished = true

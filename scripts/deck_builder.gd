@@ -51,7 +51,8 @@ func _ready() -> void:
 	add_theme_stylebox_override("panel", style)
 	var rows := VBoxContainer.new()
 	add_child(rows)
-	var optional := HBoxContainer.new()
+	var optional := GridContainer.new()
+	optional.columns = 3
 	rows.add_child(optional)
 	var title := Label.new(); title.text="DECK BUILDER"; optional.add_child(title)
 	custom_import_button = button(optional,"+ Import Custom Card",func() -> void: import_requested.emit())
@@ -64,6 +65,10 @@ func _ready() -> void:
 	add_child(back_picker)
 	back_picker.chosen.connect(func(value: Dictionary) -> void: deck["deck_back"]=value;dirty=true;status.text="Deck back selected. Save the deck to keep it.")
 	button(optional,"Deck Back…",func() -> void: back_picker.open(deck.get("deck_back",{})))
+	var back_help := Label.new()
+	back_help.text = "Deck Back sets hidden appearance for the whole deck. Next Face previews alternate card faces."
+	back_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	rows.add_child(back_help)
 	var top := HBoxContainer.new()
 	rows.add_child(top)
 	button(top, "Back to Title" if standalone else "Tabletop", func() -> void: guard(func() -> void: back_requested.emit()))

@@ -195,23 +195,32 @@ func receive(frame: Dictionary) -> void:
 			if enabled and is_host():
 				scan()
 				send_frame("resync", state)
-func submit(ops: Array) -> void:
-	if network.quiesced: return
-	if not enabled or applying or ops.is_empty(): return
-	request_sequence += 1
-	var action: Dictionary = {"action_id": Crypto.new().generate_random_bytes(16).hex_encode(), "sequence":request_sequence,"actor_player_id":local_id,"action_type":"batch","payload":ops}
+func submit(ops: Array) -> bool:
+	if network.quiesced or not enabled or applying: return false
+	if ops.is_empty(): return true
+	# A rejected/unqueued action must never consume a sequence number.
+	var next_sequence: int = request_sequence + 1
+	var action: Dictionary = {"action_id": Crypto.new().generate_random_bytes(16).hex_encode(), "sequence":next_sequence,"actor_player_id":local_id,"action_type":"batch","payload":ops}
 	if not Action.action(action):
-		log_safe("Invalid local public action refused.")
-		return
-	if is_host(): commit(action)
+		log_safe("Invalid local public action refused. Correct the last edit before retrying.")
+		table.controls.status.text = status
+		return false
+	if is_host():
+		request_sequence = next_sequence
+		commit(action)
 	else:
 		if journal.pending.size() >= 256:
 			log_safe("Waiting for pending actions to recover before accepting more.")
-			request_sequence -= 1
-			return
+			return false
+		var frame: Dictionary = {"type":"game", "protocol":network.protocol_version, "session_id":network.session.session_id, "mode":"request", "sequence":committed, "data":action}
+		if not network.send_message(frame):
+			log_safe("Public action could not be queued. It will be retried.")
+			table.controls.status.text = status
+			return false
+		request_sequence = next_sequence
 		journal.pending[action.action_id] = action.duplicate(true)
-		send_frame("request", action)
-	log_safe("Public action sent · %d" % request_sequence)
+	log_safe("Public action sent | %d" % request_sequence)
+	return true
 func commit(action: Dictionary) -> void:
 	if seen.has(action.action_id): return
 	seen[action.action_id] = true
@@ -367,8 +376,9 @@ func scan() -> void:
 	var own: Dictionary = current.players[local_id]
 	if own.hand != baseline.players[local_id].hand or own.library != baseline.players[local_id].library:
 		ops.append({"kind":"counts","data":{"player":local_id,"hand":own.hand,"library":own.library}})
+	var previous: Dictionary = baseline
 	baseline = current
-	submit(ops)
+	if not submit(ops): baseline = previous
 func capture_event(kind: String, payload: Dictionary) -> void:
 	if network.quiesced: return
 	if not enabled or applying: return

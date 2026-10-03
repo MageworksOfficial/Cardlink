@@ -60,6 +60,8 @@ func capture() -> Dictionary:
 	return result
 func resolve_art(hash: String) -> String:
 	if hash.is_empty(): return ""
+	var catalog: RefCounted = router.card_sync.catalog
+	if catalog != null and catalog.has_image(hash): return catalog.asset_path(hash)
 	for directory: String in [router.table.match_controller.loader.storage.directory, router.table.token_art_directory]:
 		var path: String = directory.path_join(hash + ".png")
 		if FileAccess.file_exists(path) and art_hash(path) == hash: return path

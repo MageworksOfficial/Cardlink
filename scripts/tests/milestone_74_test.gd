@@ -271,8 +271,8 @@ func extended_checks(app: Control, table: Node, c: Node, base: String) -> void:
 	check(table.extras.counters[0].value == 8,"Undo restores standalone counter edit")
 	table.selection.clear()
 	table.undo.invalidate()
-	table.shortcuts.handle_key(key_event(KEY_T))
-	check(table.extras.token_editor.visible,"T opens Create Token with no selection")
+	table.shortcuts.handle_key(key_event(KEY_Q))
+	check(table.extras.token_editor.visible,"Q opens Create Token with no selection")
 	var editor: Window = table.extras.token_editor
 	editor.caption.text = "Classroom Wolf"
 	editor.power.text = "2"
@@ -290,7 +290,7 @@ func extended_checks(app: Control, table: Node, c: Node, base: String) -> void:
 	check(table.controls.panels.Counter.visible,"C opens attached counter actions when a card is selected")
 	table.controls.close_panels()
 	var before_count: int = table.cards.size()
-	table.shortcuts.handle_key(key_event(KEY_T))
+	table.shortcuts.handle_key(key_event(KEY_Q))
 	check(table.cards.size() == before_count+1 and table.selected_card.state.match_instance_id != token.state.match_instance_id,"T duplicates selected token with unique identity")
 	table.shortcuts.handle_key(key_event(KEY_DELETE))
 	check(table.cards.size() == before_count,"Delete destroys selected token")

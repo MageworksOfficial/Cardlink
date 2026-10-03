@@ -67,7 +67,7 @@ func run() -> void:
 	table.select_card(card)
 	table.shortcuts.dispatcher.execute("card_face")
 	check(card.state.active_face_index == 0,"Assigned face hotkey cycles faces")
-	check(app.bindings.keys.perspective == KEY_V and app.bindings.keys.tap == KEY_Q,"V perspective and Q tap unchanged")
+	check(app.bindings.keys.perspective == KEY_V and app.bindings.keys.tap == KEY_T,"V perspective and T tap defaults")
 	card.set_face_down(true)
 	FaceAction.change(table,card,1)
 	check(card.state.face_down and card.state.active_face_index == 1,"Face-down flag remains independent of printed face")
