@@ -21,7 +21,7 @@ var field_point: Vector2 = Vector2(400, 250)
 var toast: Label
 var last_status: String = ""
 var toast_remaining: float = 0.0
-const FUNCTIONS = ["Deck / Library", "Import / Collection", "Match", "Tools", "Settings", "Controls Help", "Multiplayer / Network", "Match History", "End Turn", "Switch Perspective", "Reset View", "Reset Table Layout", "Save Match", "Undo", "Return to Title", "Exit"]
+const FUNCTIONS = ["Table", "Search / Functions (Ctrl+F)", "Deck / Library", "Import / Collection", "Match", "Tools", "Settings", "Controls Help", "Multiplayer / Network", "Match History", "End Turn", "Switch Perspective", "Reset View", "Reset Table Layout", "Save Match", "Load Match", "Undo", "Table Components", "Return to Title", "Exit"]
 func _ready() -> void:
 	tools = preload("res://scripts/match_tools.gd").new(manager.match_controller)
 	corner = PopupMenu.new()
@@ -30,7 +30,7 @@ func _ready() -> void:
 	corner.id_pressed.connect(func(id: int) -> void: choose(FUNCTIONS[id]))
 	add_child(corner)
 	field_menu = PopupMenu.new()
-	for caption: String in ["Create Token", "Create Counter", "Add Custom Zone", "Reset View", "Tools", "Match History", "End Turn"]:
+	for caption: String in ["Create Token", "Create Counter", "Add Custom Zone", "Reset View", "Tools", "Match History", "End Turn", "Add Table Component", "Battlefield Background", "Edit Background"]:
 		field_menu.add_item(caption)
 	field_menu.id_pressed.connect(field_action)
 	add_child(field_menu)
@@ -97,13 +97,27 @@ func field_action(id: int) -> void:
 		0: token_editor.open_token(null, field_point)
 		1: open_counter(create_counter(field_point))
 		2:
+			if manager.custom_table != null and manager.custom_table.enabled:
+				manager.custom_table.editor.begin_placement("zone")
+				return
 			manager.add_zone({"display_name": "Custom Zone", "zone_type": "custom_zone", "player_id": "local", "position": field_point})
 		3: manager.view.reset_view()
 		4: tools_window.popup_centered()
 		5: toggle_history()
 		6: manager.match_controller.end_turn()
+		7: open_components()
+		8: manager.appearance.open()
+		9: manager.appearance.toggle_edit()
 func choose(caption: String) -> void:
 	match caption:
+		"Table":
+			var submenu:=PopupMenu.new();add_child(submenu);submenu.add_item("Battlefield Background");submenu.add_item("Edit Background");submenu.id_pressed.connect(func(id: int) -> void:
+				if id==0: manager.appearance.open()
+				else: manager.appearance.toggle_edit())
+			submenu.popup_hide.connect(submenu.queue_free);submenu.position=corner.position;submenu.popup()
+		"Search / Functions (Ctrl+F)":
+			if manager.get_parent().app_shell!=null: manager.get_parent().app_shell.function_search.open.call_deferred()
+		"Table Components": open_components()
 		"Deck / Library": manager.controls.open_panel("Library")
 		"Settings": manager.get_parent().app_shell.shared_settings.open() if manager.get_parent().app_shell != null else manager.controls.open_panel("Layout")
 		"Controls Help": manager.shortcuts.open_help()
@@ -129,9 +143,14 @@ func choose(caption: String) -> void:
 		"Switch Perspective": manager.perspective.toggle()
 		"Reset View": manager.view.reset_view()
 		"Reset Table Layout": manager.organization.reset_layout()
-		"Save Match": manager.controls.open_panel("Match")
+		"Save Match", "Load Match":
+			if manager.battle.connected(): manager.battle.saves.open(caption=="Load Match")
+			else: manager.controls.open_panel("Match")
 		"Undo": manager.undo.undo()
 		_: manager.controls.open_panel(caption)
+func open_components() -> void:
+	if manager.custom_table != null and manager.custom_table.enabled: manager.custom_table.panel.open_palette()
+	else: manager.controls.status.text = "Choose Build Your Own from the title screen to use Table Components."
 func is_modal() -> bool:
 	return corner.visible or field_menu.visible or tools_window.visible or history_window.visible or counter_window.visible or token_editor.visible
 func close_all() -> void:
@@ -185,10 +204,10 @@ func refresh_history() -> void:
 	if history_text == null:
 		return
 	var model: RefCounted = manager.match_controller.model
-	turn_label.text = "Turn %d — %s" % [model.turn_number, model.players[model.active_player].display_name]
+	turn_label.text = "Turn %d â€” %s" % [model.turn_number, model.players[model.active_player].display_name]
 	var lines: PackedStringArray = []
 	for event: Dictionary in model.history:
-		lines.append(event.text if event.kind == "turn" else "Turn %d · %s\n%s" % [event.turn, model.players[event.actor].display_name, event.text])
+		lines.append(event.text if event.kind == "turn" else "Turn %d Â· %s\n%s" % [event.turn, model.players[event.actor].display_name, event.text])
 	history_text.text = "\n\n".join(lines)
 func build_counter_editor() -> void:
 	counter_window = make_window("Counter Properties", Vector2i(360, 260))

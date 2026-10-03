@@ -60,4 +60,6 @@ static func write_atomic(path: String, bytes: PackedByteArray) -> Error:
 		error = DirAccess.rename_absolute(temporary, path)
 	if error != OK:
 		DirAccess.remove_absolute(temporary)
+	if error == OK and path.get_extension().to_lower() == "json" and path.get_base_dir().get_file() == "definitions":
+		preload("res://scripts/collection_events.gd").publish(path.get_base_dir().get_base_dir())
 	return error

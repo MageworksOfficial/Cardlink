@@ -30,7 +30,7 @@ func project_item(item: Control) -> void:
 func apply() -> void:
 	manager.world.pivot_offset = Vector2.ZERO
 	manager.world.rotation = PI if flipped() else 0.0
-	manager.world.position = manager.view.pan + (manager.world.LOGICAL_SIZE*manager.view.zoom if flipped() else Vector2.ZERO)
+	manager.world.position = manager.view.pan + (manager.world.size*manager.view.zoom if flipped() else Vector2.ZERO)
 	var c: Node = manager.match_controller
 	for item: Control in manager.cards + manager.zones + manager.extras.counters + [c.pile_view,c.opponent_pile]: project_item(item)
 	for player: String in c.hearts.hearts:

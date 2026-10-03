@@ -3,7 +3,7 @@ extends Node
 signal request_sent(action: String, data: Dictionary)
 var service_url: String = ""
 var timeout_seconds: float = 6.0
-const FIELDS = {"health": [], "lookup": ["code"], "create": ["session_id", "protocol", "app_version", "addresses", "port"], "join": ["code", "protocol", "app_version"], "heartbeat": ["code", "token", "connected"], "resume": ["code", "token"], "relay": ["code", "token"], "close": ["code", "token"]}
+const FIELDS = {"save_capability":["code","token","version"],"health": [], "lookup": ["code"], "create": ["session_id", "protocol", "app_version", "addresses", "port"], "join": ["code", "protocol", "app_version"], "heartbeat": ["code", "token", "connected"], "resume": ["code", "token"], "relay": ["code", "token"], "close": ["code", "token"]}
 func configured() -> bool:
 	var endpoint := RegEx.new()
 	endpoint.compile("^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?/?$|^http://(127\\.0\\.0\\.1|localhost):[0-9]{1,5}/?$")
@@ -24,6 +24,8 @@ func valid_payload(action: String, data: Dictionary) -> bool:
 				expression.compile("^[A-Z]{4}-[0-9]{4}$")
 				if not value is String or expression.search(value) == null:
 					return false
+			"version":
+				if not value is int or value!=3: return false
 			"protocol", "port":
 				if not value is int or value < (1024 if key == "port" else 1) or value > 65535:
 					return false

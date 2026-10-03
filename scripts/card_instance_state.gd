@@ -30,7 +30,9 @@ func set_counter(counter_name: String, value: int) -> void:
 	var key: String = counter_name.strip_edges()
 	if key.is_empty():
 		return
-	if value <= 0:
+	if key == "Loyalty":
+		counters[key] = clampi(value,0,1000000)
+	elif value <= 0:
 		counters.erase(key)
 	else:
 		counters[key] = value

@@ -1,3 +1,11 @@
+# CardLink 7 V0.8.1 Beta — source milestone
+
+Choose your table: keep the familiar CardLink Standard setup, or build a blank table with your own piles, shared decks, zones and board images. Save and share arrangements as `.cltemplate` files, with optional images and no bundled card collection.
+
+This is a local source update prepared for review, not a published release or refreshed export. Both updated clients and the relay validator update are needed for custom public-relay play. See CARDLINK_7_V081_CUSTOM_TABLE_REPORT.md and KNOWN_ISSUES.md. Existing 7.8.1 release names below are historical; technical protocol/save identifiers remain separate from the new player-facing label.
+
+---
+
 # CardLink 7.8.1 Beta
 CardLink is still in active development. You may encounter bugs, rough edges, or features that are still being improved. Your feedback is deeply appreciated and helps make CardLink better for everyone. If something feels confusing, breaks, or could work better, please let us know. Thank you for testing CardLink.
 

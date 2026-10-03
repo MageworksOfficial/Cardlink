@@ -18,7 +18,7 @@ func _ready() -> void:
 	library.back_requested.connect(func() -> void:
 		library.hide()
 		tabletop.set_active(true))
-	library.import_requested.connect($CardImporter.open_importer)
+	library.import_requested.connect(func() -> void: preload("res://scripts/collection_workflow.gd").custom(library))
 	library.place_requested.connect(_place_card)
 	var browse := Button.new()
 	browse.text = "Card Library"
@@ -38,6 +38,7 @@ func _ready() -> void:
 		deck_builder.hide()
 		tabletop.set_active(true))
 	deck_builder.play_requested.connect(_request_play)
+	deck_builder.import_requested.connect(func() -> void: preload("res://scripts/collection_workflow.gd").custom(deck_builder))
 	var decks := Button.new()
 	decks.text = "Deck Builder"
 	decks.position = Vector2(24, 100)
@@ -57,15 +58,8 @@ func _ready() -> void:
 	add_child(archive_importer)
 	library.archive_requested.connect(open_archive_importer)
 	deck_builder.archive_requested.connect(open_archive_importer)
-	archive_importer.imported.connect(func(result: Dictionary) -> void:
-		if library.visible:
-			library.refresh()
-		if deck_builder.visible or deck_builder.saved_path == result.path:
-			deck_builder.records = deck_builder.loader.load_records()
-			deck_builder.refresh_catalog()
+	archive_importer.imported.connect(func(_result: Dictionary) -> void:
 		deck_builder.refresh_saved()
-		if deck_builder.saved_path == result.path and not deck_builder.dirty:
-			deck_builder.load_selected()
 		tabletop.controls.refresh_decks())
 func _request_play(deck: Dictionary, leaders_out: bool) -> void:
 	pending_deck = deck
@@ -90,8 +84,6 @@ func _place_card(record: Dictionary) -> void:
 	tabletop.set_active(true)
 func _on_card_imported(metadata: Dictionary, reused: bool) -> void:
 	$ImportStatus.text = "Saved: %s%s" % [metadata["name"], " (image reused)" if reused else ""]
-	if library.visible:
-		library.refresh()
 
 func open_library() -> void:
 	tabletop.set_active(false)
@@ -104,7 +96,7 @@ func open_deck_builder() -> void:
 
 func open_archive_importer() -> void:
 	tabletop.controls.close_panels()
-	deck_builder.guard(archive_importer.open_importer)
+	archive_importer.open_importer()
 
 func ensure_network() -> Node:
 	var panel: Node = get_node_or_null("Network")

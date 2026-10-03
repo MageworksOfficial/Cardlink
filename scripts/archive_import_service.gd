@@ -236,3 +236,4 @@ func rollback(created: Array[Dictionary]) -> void:
 	for row: Dictionary in created:
 		if not used.has(row.id) and FileAccess.get_sha256(row.path) == row.hash:
 			DirAccess.remove_absolute(row.path)
+			preload("res://scripts/collection_events.gd").publish(cards.directory)

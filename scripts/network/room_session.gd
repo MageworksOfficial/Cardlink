@@ -41,6 +41,11 @@ func update(text: String) -> void:
 	status = text
 	changed.emit()
 func valid_room(data: Dictionary) -> bool:
+	if data.has("save_state_version") and not preload("res://scripts/network/network_action.gd").number(data.save_state_version,0,65535): return false
+	if data.has("save_peers"):
+		if not data.save_peers is Dictionary or data.save_peers.size()>2: return false
+		for key: Variant in data.save_peers:
+			if key not in ["host","guest"] or not preload("res://scripts/network/network_action.gd").number(data.save_peers[key],0,65535): return false
 	for key: String in ["code", "session_id", "app_version", "state", "mode"]:
 		if not data.get(key) is String or str(data[key]).length() > 48:
 			return false
@@ -64,13 +69,13 @@ func preflight(name_text: String) -> bool:
 	if active or busy or not network.available():
 		return false
 	if not Codec.safe_text(name_text.strip_edges(), 48):
-		update("Enter a display name of 1–48 characters.")
+		update("Enter a display name of 1â€“48 characters.")
 		return false
 	busy = true
 	generation += 1
 	var run: int = generation
 	diagnostics = Diagnostics.new()
-	update("Checking connection conditions…")
+	update("Checking connection conditionsâ€¦")
 	var health: Dictionary = await signaling.call_service("health", {})
 	if run != generation:
 		return false
@@ -80,10 +85,10 @@ func preflight(name_text: String) -> bool:
 	if health.get("service") != "cardlink-rendezvous" or health.get("api") != 1 or not health.get("relay_available") is bool:
 		fail("invalid_response")
 		return false
-	diagnostics.internet = "Local test only" if signaling.service_url.begins_with("http://") else "✓ Service reachable"
-	diagnostics.service = "✓ Available"
-	diagnostics.room_service = "✓ Compatible endpoint"
-	diagnostics.relay = "Available · not tested yet" if health.relay_available else "Unavailable"
+	diagnostics.internet = "Local test only" if signaling.service_url.begins_with("http://") else "âœ“ Service reachable"
+	diagnostics.service = "âœ“ Available"
+	diagnostics.room_service = "âœ“ Compatible endpoint"
+	diagnostics.relay = "Available Â· not tested yet" if health.relay_available else "Unavailable"
 	if health.get("protocol", network.protocol_version) != network.protocol_version:
 		incompatible(health)
 		return false
@@ -101,7 +106,7 @@ func preflight(name_text: String) -> bool:
 	if relay_health.has("error"):
 		fail("relay_unavailable")
 		return false
-	diagnostics.relay = "✓ Reachable · peer pairing not tested"
+	diagnostics.relay = "âœ“ Reachable Â· peer pairing not tested"
 	caption = name_text.strip_edges()
 	return true
 func host_room(name_text: String) -> void:
@@ -110,7 +115,7 @@ func host_room(name_text: String) -> void:
 		return
 	var run: int = generation
 	role = "host"
-	update("Creating a temporary room…")
+	update("Creating a temporary roomâ€¦")
 	var probe := TCPServer.new()
 	if probe.listen(0) != OK:
 		fail("direct_unavailable")
@@ -134,9 +139,11 @@ func host_room(name_text: String) -> void:
 		return
 	if not accept_room(result):
 		return
+	await announce_save_capability()
+	if run!=generation: return
 	network.required_join_key = join_key
 	method = "Waiting"
-	update("Room %s · waiting for your friend." % code)
+	update("Room %s Â· waiting for your friend." % code)
 func join_room(code_text: String, name_text: String) -> void:
 	last_intent = "join"
 	var normalized: String = code_text.strip_edges().to_upper().replace(" ", "")
@@ -149,14 +156,14 @@ func join_room(code_text: String, name_text: String) -> void:
 		return
 	var run: int = generation
 	role = "guest"
-	update("Finding room…")
+	update("Finding roomâ€¦")
 	var lookup: Dictionary = await signaling.call_service("lookup", {"code": normalized})
 	if run != generation:
 		return
 	if lookup.has("error"):
 		fail(str(lookup.error))
 		return
-	update("Host found · checking compatibility…")
+	update("Host found Â· checking compatibilityâ€¦")
 	if lookup.get("protocol") != network.protocol_version or lookup.get("app_version") != Codec.APP_VERSION:
 		incompatible(lookup)
 		return
@@ -170,9 +177,11 @@ func join_room(code_text: String, name_text: String) -> void:
 		return
 	if not accept_room(result):
 		return
-	update("Negotiating connection…")
+	await announce_save_capability()
+	if run!=generation: return
+	update("Negotiating connectionâ€¦")
 	method = "Direct"
-	update("Trying direct connection…")
+	update("Trying direct connectionâ€¦")
 	var endpoints: Array = room.addresses.duplicate()
 	for address: String in endpoints:
 		if run != generation or relaying:
@@ -192,7 +201,7 @@ func join_room(code_text: String, name_text: String) -> void:
 			await get_tree().process_frame
 	if run == generation and active and not relaying:
 		diagnostics.direct = "Unavailable"
-		update("Direct connection was blocked. Trying relay mode…")
+		update("Direct connection was blocked. Trying relay modeâ€¦")
 		var fallback: Dictionary = await signaling.call_service("relay", {"code": code, "token": token})
 		if run != generation:
 			return
@@ -203,6 +212,11 @@ func join_room(code_text: String, name_text: String) -> void:
 			start_relay()
 		else:
 			fail("invalid_response")
+func announce_save_capability() -> void:
+	if not network.save_capable or room.get("save_state_version",0)!=3: return
+	var run: int=generation
+	var announced: Dictionary=await signaling.call_service("save_capability",{"code":code,"token":token,"version":3})
+	if run==generation and valid_room(announced): room=announced
 func accept_room(result: Dictionary) -> bool:
 	if result.has("error"):
 		fail(str(result.error))
@@ -220,7 +234,7 @@ func accept_room(result: Dictionary) -> bool:
 	join_key = result.join_key
 	session_id = result.session_id
 	active = true
-	diagnostics.room_service = "✓ Room verified"
+	diagnostics.room_service = "âœ“ Room verified"
 	busy = false
 	clock = 0
 	was_connected = false
@@ -265,6 +279,9 @@ func heartbeat() -> void:
 		relaying = false
 		recovering = true
 	room = result
+	if network.save_capable and room.get("save_state_version",0)==3 and room.get("save_peers",{}).get(role,0)!=3:
+		await announce_save_capability()
+		if run!=generation: return
 	if room.mode == "relay" and not relaying and not was_connected:
 		start_relay()
 func start_relay() -> void:
@@ -277,7 +294,7 @@ func start_relay() -> void:
 		fail("relay_unavailable")
 		return
 	method = "Relay"
-	update("Using relay fallback…")
+	update("Using relay fallbackâ€¦")
 	network.cleanup()
 	network.state("connecting", "Connecting through the relay.")
 	var relay_url: String = signaling.service_url
@@ -292,15 +309,16 @@ func start_relay() -> void:
 		fail("relay_unavailable")
 		return
 	network.adopt_stream(result.stream, role, caption, session_id, join_key)
+	network.relay_save_capable=room.get("save_state_version",0)==3
 func connected() -> void:
 	was_connected = true
 	recovering = false
 	method = "Relay" if relaying else "Direct"
-	diagnostics.direct = "✓ Connected" if not relaying else "Unavailable"
+	diagnostics.direct = "âœ“ Connected" if not relaying else "Unavailable"
 	if relaying:
-		diagnostics.relay = "✓ Connected"
-	diagnostics.ready = "✓ Connected"
-	update("Connected · %s" % method)
+		diagnostics.relay = "âœ“ Connected"
+	diagnostics.ready = "âœ“ Connected"
+	update("Connected Â· %s" % method)
 func incompatible(other: Dictionary) -> void:
 	var details: String = "Your build: %s / protocol %d. Host: %s / protocol %s. Both players need compatible builds." % [Codec.APP_VERSION, network.protocol_version, str(other.get("app_version", "unknown")).left(24), str(other.get("protocol", "unknown")).left(8)]
 	cancel()
@@ -325,7 +343,7 @@ func resume_connection() -> void:
 	resuming = true
 	var run: int = generation
 	network.cleanup()
-	network.state("disconnected", "Reconnecting room…")
+	network.state("disconnected", "Reconnecting roomâ€¦")
 	was_connected = false
 	relaying = false
 	recovering = true
@@ -336,6 +354,8 @@ func resume_connection() -> void:
 		update("Room recovery unavailable or expired. Keep both apps open; retry or create a new room with your friend.")
 		return
 	room = result
+	await announce_save_capability()
+	if run!=generation: return
 	session_id = room.session_id
 	start_relay()
 func cancel() -> void:

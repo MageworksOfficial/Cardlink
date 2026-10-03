@@ -1,0 +1,101 @@
+extends "res://scripts/tests/milestone_6b_test.gd"
+const BG=preload("res://scripts/appearance/background_config.gd")
+func same(a: Dictionary,b: Dictionary) -> bool: return JSON.parse_string(JSON.stringify(a))==JSON.parse_string(JSON.stringify(b))
+func run() -> void:
+	var base: String=OS.get_cmdline_user_args()[0]
+	root.size=Vector2i(1152,648);root.gui_embed_subwindows=true
+	var a: Control=await create_client(base.path_join("a"),"Appearance Host",Color.CORAL)
+	var m: Node=a.tabletop;var c: Node=m.match_controller;var appearance: Node=m.appearance
+	appearance.assets.directory=base.path_join("a_backgrounds")
+	check(BG.valid(appearance.background),"Default background validates")
+	var invalid: Dictionary=BG.defaults();invalid["private_cards"]=[]
+	check(not BG.valid(invalid),"Unknown/private background fields rejected")
+	invalid=BG.defaults();invalid.opacity=-1
+	check(not BG.valid(invalid),"Invalid opacity rejected")
+	appearance.toggle_edit();check(not appearance.editing,"Play mode blocks background editing")
+	m.layout.set_edit_mode(true);appearance.toggle_edit();check(appearance.editing,"Layout enables background editing")
+	var image:=Image.create_from_data(600,400,false,Image.FORMAT_RGBA8,Crypto.new().generate_random_bytes(600*400*4))
+	var saved: Dictionary=appearance.assets.store(image.save_png_to_buffer())
+	var value: Dictionary=BG.defaults();value.type="image";value.asset=saved.hash;value.locked=false
+	appearance.apply(value);appearance.fit()
+	check(is_equal_approx(appearance.layer.size.x/appearance.layer.size.y,1.5),"Fit preserves image aspect")
+	appearance.fit(true);check(appearance.layer.size.x>=m.world.size.x and appearance.layer.size.y>=m.world.size.y,"Fill covers table")
+	value=appearance.background.duplicate(true);value.size=[6000,4000];value.position=[-700,-800];value.rotation=90;value.opacity=0.5;appearance.apply(value)
+	check(appearance.layer.size==Vector2(6000,4000) and is_equal_approx(appearance.layer.rotation,PI/2),"Oversized transform and rotation apply")
+	var snapshot: Dictionary=preload("res://scripts/match_local_state.gd").capture(m)
+	check(preload("res://scripts/match_local_state.gd").validate(snapshot).is_empty(),"Background accepted in match save")
+	appearance.reset_background();preload("res://scripts/match_local_state.gd").restore(m,snapshot)
+	check(appearance.background==value,"Match restore preserves full background configuration")
+	appearance.reset_transform();check(appearance.background.asset==saved.hash and appearance.background.rotation==0 and appearance.background.opacity==1,"Reset Transform retains image")
+	value=appearance.background.duplicate(true);value.locked=true;appearance.apply(value);var locked: Dictionary=appearance.background.duplicate(true);appearance.fit(true)
+	check(appearance.background==locked,"Lock blocks transform changes")
+	m.layout.set_edit_mode(false);await process_frame;check(not appearance.editing,"Play mode disables background handles")
+	var doc: Dictionary=preload("res://scripts/custom_table/table_document.gd").fresh();doc.background=value
+	var store=preload("res://scripts/custom_table/template_storage.gd").new();store.directory=base.path_join("templates");store.assets=appearance.assets
+	var exported: Dictionary=store.save(doc);var loaded: Dictionary=store.preview(exported.path)
+	check(same(loaded.table.background,value) and loaded.images.is_empty(),"Template round trip retains background, packaging off")
+	store.export_file(doc,base.path_join("with-image.cltemplate"),true)
+	check(store.preview(base.path_join("with-image.cltemplate")).images.has(saved.hash),"Optional template image packaging includes background")
+	var key:=InputEventKey.new();key.pressed=true;key.keycode=KEY_R;key.ctrl_pressed=true;key.alt_pressed=true;key.shift_pressed=true
+	check(m.shortcuts.bindings.action_for(key)=="reset_match","Ctrl+Alt+Shift+R resolves to existing reset")
+	key.shift_pressed=false
+	check(m.shortcuts.bindings.action_for(key).is_empty(),"Old Ctrl+Alt+R no longer opens reset")
+	key.shift_pressed=true
+	var config_file:=ConfigFile.new();config_file.set_value("keys","reset_match",KEY_R | KEY_MASK_CTRL | KEY_MASK_ALT);config_file.save(base.path_join("old-bindings.cfg"))
+	var migrated=preload("res://scripts/usability/input_bindings.gd").new(base.path_join("old-bindings.cfg"))
+	check(migrated.action_for(key)=="reset_match","Saved previous default migrates to four-key shortcut")
+	var field:=LineEdit.new();a.add_child(field);field.grab_focus();var old_count: int=m.cards.size();m.shortcuts.handle_key(key)
+	check(m.cards.size()==old_count and m.shortcuts.blocked(),"Typing guard suppresses reset shortcut")
+	field.release_focus();field.queue_free();await process_frame
+	m.shortcuts.handle_key(key)
+	check(is_instance_valid(m.battle.reset.prompt) and m.battle.reset.prompt.visible and m.cards.size()==old_count,"Offline shortcut opens confirmation without resetting")
+	m.battle.reset.prompt.hide()
+	var sources: Array=m.battle.reset.start.sources
+	m.controls.deck_storage.directory=base.path_join("decks")
+	var deck: Dictionary=sources[0].deck.duplicate(true);var stored: Dictionary=m.controls.deck_storage.save_deck(deck)
+	var back: Dictionary={"type":"preset","color":"#0000ff","preset":"Blue","asset":""}
+	check(appearance.sleeves.apply_back("local",back),"Standard match-only back change")
+	check(not JSON.parse_string(FileAccess.get_file_as_string(stored.path)).has("deck_back"),"Match-only leaves saved deck unchanged")
+	check(appearance.sleeves.apply_back("local",back,true),"Save With Deck updates matching saved deck")
+	check(JSON.parse_string(FileAccess.get_file_as_string(stored.path)).deck_back==back,"Deck back persists on disk")
+	appearance.sleeves.open("local");check(appearance.sleeves.picker.visible,"In-match back picker opens");appearance.sleeves.picker.hide()
+	var b: Control=await create_client(base.path_join("b"),"Appearance Guest",Color.BLUE)
+	var other: Node=b.tabletop.appearance;other.assets.directory=base.path_join("b_backgrounds")
+	var na: Node=a.get_node("Network").network;var nb: Node=b.get_node("Network").network
+	var ra: Node=a.get_node("Network").gameplay;var rb: Node=b.get_node("Network").gameplay
+	var port: int=randi_range(33000,43000);na.host_game(port,"Host","127.0.0.1");nb.join_game("127.0.0.1",port,"Guest")
+	check(await wait_for(func() -> bool: return na.session.state=="connected" and nb.session.state=="connected"),"Two local appearance clients connect")
+	ra.start();rb.start();await wait_for(func() -> bool: return ra.card_sync.checked and rb.card_sync.checked);ra.card_sync.decide("placeholders");rb.card_sync.decide("placeholders")
+	check(await wait_for(func() -> bool: return ra.enabled and rb.enabled),"Shared tabletop enabled")
+	value.locked=false;value.rotation=180;appearance.apply(value)
+	check(await wait_for(func() -> bool: return same(other.background,value)),"Background config/transform reaches guest")
+	c.draw_card()
+	check(await wait_for(func() -> bool: return b.tabletop.match_controller.hidden_count("opponent","hand")==1),"Hand-count action stays responsive during background transfer")
+	check(not FileAccess.file_exists(other.assets.path(saved.hash)),"Gameplay update arrives before multi-chunk image finishes")
+	check(await wait_for(func() -> bool: return FileAccess.file_exists(other.assets.path(saved.hash))),"Missing background image transfers")
+	check(FileAccess.get_sha256(other.assets.path(saved.hash))==saved.hash,"Received background hash verified")
+	var changed: Dictionary=value.duplicate(true);changed.opacity=0.3;other.apply(changed)
+	check(await wait_for(func() -> bool: return same(appearance.background,changed)),"Guest background edit reaches host")
+	appearance.sleeves.apply_back("opponent",back)
+	check(await wait_for(func() -> bool: return other.sleeves.approval.visible),"Remote sleeve change requires approval")
+	other.sleeves.approval.confirmed.emit();other.sleeves.approval.hide()
+	check(b.tabletop.match_controller.model.players.local.deck_back==back,"Accept applies remote request locally")
+	check(await wait_for(func() -> bool: return m.deck_backs.remote.library==back),"Accepted back config syncs to requester")
+	c.draw_card();await settle();check(c.model.players.local.hand.size()==2,"Gameplay remains usable after background transfer")
+	old_count=m.cards.size();m.shortcuts.handle_key(key)
+	check(m.battle.reset.prompt.visible and m.cards.size()==old_count,"Online reset shortcut opens existing safe flow")
+	m.battle.reset.prompt.confirmed.emit();m.battle.reset.prompt.hide()
+	check(await wait_for(func() -> bool: return b.tabletop.battle.reset.phase=="received"),"Online shortcut still requires opponent approval")
+	b.tabletop.battle.reset.decline();await settle()
+	check(m.cards.size()==old_count,"Declining shortcut reset leaves game intact")
+	appearance.sleeves.apply_back("opponent",{"type":"color","color":"#123456","preset":"","asset":""});await settle()
+	other.sleeves.approval.canceled.emit();other.sleeves.approval.hide()
+	check(b.tabletop.match_controller.model.players.local.deck_back==back,"Declining sleeve request preserves current sleeve")
+	na.disconnect_session();await settle();ra.recovery.reconnect();rb.recovery.reconnect()
+	check(await wait_for(func() -> bool: return ra.recovery.authenticated and rb.recovery.authenticated and not ra.recovery.suspended and not rb.recovery.suspended),"Authenticated appearance reconnect succeeds")
+	check(await wait_for(func() -> bool: return same(appearance.background,other.background)),"Background restored consistently after reconnect")
+	other.apply(BG.defaults(),false)
+	check(await wait_for(func() -> bool: return same(appearance.background,other.background)),"Periodic appearance snapshot repairs local presentation mismatch")
+	na.disconnect_session();nb.disconnect_session()
+	a.queue_free();b.queue_free();await process_frame
+	print("APPEARANCE: %d checks, %d failures" % [checks,failures]);quit(0 if failures==0 else 1)

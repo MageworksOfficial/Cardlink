@@ -54,12 +54,13 @@ func build_ui(parent: Node) -> void:
     hud.hide()
 func can_start() -> bool:
     var s: Node = sync()
-    return connected() and not panel.gameplay.recovery.suspended and s.pending and s.have_remote and not s.own.is_empty() and not s.remote.is_empty()
+    return connected() and not panel.gameplay.recovery.suspended and s.pending and s.have_remote and (not s.own.is_empty() and not s.remote.is_empty())
 func start_match() -> void:
     if not can_start(): return
     if panel.gameplay.enabled:
         panel.window.hide()
         return
+    if panel.gameplay.opted_in: return
     panel.apply_starting_life()
     panel.gameplay.start_public()
     panel.window.hide()

@@ -35,7 +35,7 @@ func refresh() -> void:
 		item.controller = controller
 		item.instance_id = card.state.match_instance_id
 		item.publicly_revealed = controller.visibility.stable_visibility(card.state) == "public" and not card.state.face_down
-		item.texture = card.card_image.texture if (controller.visibility.can_present(card.state, "local") or controller.playtest.local_playtest()) else controller.manager.backs.texture()
+		item.texture = card.card_image.texture if (controller.visibility.can_present(card.state, "local") or controller.playtest.local_playtest()) else preload("res://scripts/battle/deck_back.gd").for_card(card,controller.manager.backs)
 		item.custom_minimum_size = Vector2(70, 98)
 		item.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		item.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -43,6 +43,9 @@ func refresh() -> void:
 		item.mouse_entered.connect(func() -> void: controller.show_preview(card))
 		item.mouse_exited.connect(controller.hide_preview)
 		item.gui_input.connect(func(event: InputEvent) -> void:
+			if controller.manager.selection!=null and controller.manager.selection.hand_input(card,item,event):
+				item.accept_event()
+				return
 			if event is InputEventMouseButton and event.pressed:
 				controller.manager.select_card(card)
 				if event.button_index == MOUSE_BUTTON_RIGHT:
@@ -51,8 +54,8 @@ func refresh() -> void:
 		row.add_child(item)
 	row.update_minimum_size()
 	row.queue_sort()
-	label.text = ("Player 2 hand: %d · Drag to play" if controller.active_hand_player() == "opponent" else "Your hand: %d · Drag to play · Right-click for actions") % count
-	if controller.playtest.local_playtest(): label.text = controller.model.players[controller.active_hand_player()].display_name+" hand: "+str(count)+" · Drag to play · Right-click for actions"
+	label.text = ("Player 2 hand: %d · Drag to play" if controller.active_hand_player() == "opponent" else "Your hand: %d · Drag to play · Ctrl-click to select · Right-click for actions") % count
+	if controller.playtest.local_playtest(): label.text = controller.model.players[controller.active_hand_player()].display_name+" hand: "+str(count)+" · Drag to play · Ctrl-click to select · Right-click for actions"
 
 
 var layout_dragging: bool = false

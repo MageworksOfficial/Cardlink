@@ -1,9 +1,17 @@
 extends Control
 enum Mode { TITLE, ONLINE, OFFLINE_PLAYTEST }
 var mode: Mode = Mode.TITLE
+var table_selection: Control
+var pending_table_mode: Mode = Mode.OFFLINE_PLAYTEST
+var custom_table_selected: bool = false
 var title_screen: Control
 var table_scene: Control
+var function_search: Node
+var update_service: Node
+var updater: Node
+var entry_intent: int = 0
 var entering: bool = false
+var deck_workspace: Control
 var privacy_path: String = "user://hidden_zone_settings.cfg"
 var bindings = preload("res://scripts/usability/input_bindings.gd").new()
 var table_preferences = preload("res://scripts/usability/table_preferences.gd").new()
@@ -21,8 +29,8 @@ func _ready() -> void:
 	theme = preload("res://scripts/frontend/frontend_theme.gd").make_theme()
 	title_screen = preload("res://scenes/title_screen.tscn").instantiate()
 	add_child(title_screen)
-	title_screen.online_requested.connect(enter_mode.bind(Mode.ONLINE))
-	title_screen.offline_requested.connect(func() -> void: entry.offline())
+	title_screen.online_requested.connect(choose_table.bind(Mode.ONLINE))
+	title_screen.offline_requested.connect(choose_table.bind(Mode.OFFLINE_PLAYTEST))
 	title_screen.exit_requested.connect(request_exit)
 	return_dialog = ConfirmationDialog.new()
 	return_dialog.title = "Return to title?"
@@ -48,7 +56,17 @@ func _ready() -> void:
 	departure.shell = self
 	add_child(departure)
 	departure.build()
+	function_search=preload("res://scripts/usability/function_search.gd").new()
+	function_search.shell=self
+	add_child(function_search)
 	build_entry_controls()
+	table_selection = preload("res://scripts/custom_table/table_selection.gd").new()
+	add_child(table_selection)
+	table_selection.hide()
+	table_selection.chosen.connect(table_chosen)
+	table_selection.back_requested.connect(func() -> void: table_selection.hide(); title_screen.show(); title_screen.focus_preferred())
+	table_selection.settings_requested.connect(func() -> void: shared_settings.open())
+	table_selection.exit_requested.connect(request_exit)
 	loading = Label.new()
 	loading.text = "Opening your table…"
 	loading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -63,8 +81,39 @@ func _ready() -> void:
 	recovery.storage.directory = recovery_directory
 	add_child(recovery)
 	recovery.inspect.call_deferred()
+	if update_service==null: update_service=preload("res://scripts/updater/update_service.gd").new()
+	add_child(update_service)
+	updater=preload("res://scripts/updater/update_ui.gd").new();updater.shell=self;updater.service=update_service;add_child(updater)
+func choose_table(next: Mode) -> void:
+	if entering or mode != Mode.TITLE: return
+	entry_intent+=1
+	var intent: int=entry_intent
+	if next==Mode.ONLINE and updater!=null:
+		if not await updater.allow_online(): return
+		if entering or mode!=Mode.TITLE or intent!=entry_intent: return
+	pending_table_mode = next
+	entry.window.hide()
+	title_screen.hide()
+	table_selection.show()
+	table_selection.first.grab_focus()
+func table_chosen(custom: bool) -> void:
+	custom_table_selected = custom
+	table_selection.hide()
+	title_screen.show()
+	if custom:
+		entry.pending_decks.clear()
+		entry.pending_path = ""
+		entry.setup_ready = false
+		enter_mode(pending_table_mode)
+	elif pending_table_mode == Mode.ONLINE: enter_mode(pending_table_mode)
+	else: entry.offline()
 func enter_mode(next: Mode) -> void:
 	if entering or mode != Mode.TITLE or next == Mode.TITLE: return
+	entry_intent+=1
+	var intent: int=entry_intent
+	if next==Mode.ONLINE and updater!=null:
+		if not await updater.allow_online(): return
+		if entering or mode!=Mode.TITLE or intent!=entry_intent: return
 	entering = true
 	shared_settings.welcome.hide()
 	entry.window.hide()
@@ -96,6 +145,7 @@ func enter_mode(next: Mode) -> void:
 			c.model.players[player].display_name = entry.player_names[i]
 			c.model.players[player].life = entry.player_lives[i]
 	entry.setup_ready = false
+	for player: String in ["local","opponent"]: table_scene.tabletop.battle.reset.start.life[player]=c.model.players[player].life
 	c.refresh()
 	if preferences.get_flag("hands_hidden"): table_scene.tabletop.shortcuts.toggle_hands()
 	departure.path = ""
@@ -134,6 +184,8 @@ func enter_mode(next: Mode) -> void:
 	var records: Control = table_scene.tabletop.controls.match_records
 	records.record_saved.connect(func(path: String) -> void: departure.mark_saved(path))
 	records.record_loaded.connect(func(path: String) -> void: departure.mark_saved(path))
+	if custom_table_selected and not table_scene.tabletop.custom_table.enabled:
+		table_scene.tabletop.custom_table.start_blank()
 	if next == Mode.ONLINE: table_scene.open_network_panel()
 	loading.hide()
 	entering = false
@@ -156,6 +208,8 @@ func return_to_title() -> void:
 	if entering: return
 	dispose_table()
 	mode = Mode.TITLE
+	custom_table_selected = false
+	table_selection.hide()
 	title_screen.modulate.a = 0
 	title_screen.show()
 	create_tween().tween_property(title_screen,"modulate:a",1.0,0.01 if bool(table_preferences.value("reduce_motion",false)) else 0.22)
@@ -185,11 +239,11 @@ func _notification(what: int) -> void:
 
 func build_entry_controls() -> void:
 	var row := HBoxContainer.new()
-	row.position = Vector2(500,320)
-	row.size = Vector2(672,42)
+	row.position = Vector2(385,320)
+	row.size = Vector2(902,42)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	title_screen.composition.add_child(row)
-	for item: Array in [["New Match",entry.new_match],["Resume Match",entry.resume_match],["Controls",func() -> void: shared_settings.open_help()]]:
+	for item: Array in [["Deck Builder",open_deck_workspace],["New Match",entry.new_match],["Resume Match",entry.resume_match],["Controls",func() -> void: shared_settings.open_help()]]:
 		var button := Button.new()
 		button.text = item[0]
 		button.custom_minimum_size = Vector2(185,40)
@@ -197,11 +251,12 @@ func build_entry_controls() -> void:
 		row.add_child(button)
 		if item[0] == "Resume Match": entry.resume_button = button
 	entry.refresh_resume()
-	var version := Label.new()
-	version.name = "BuildVersion"
-	version.text = preload("res://scripts/frontend/app_info.gd").LABEL
-	version.position = Vector2(0,805)
-	version.size.x = 1672
-	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	version.add_theme_color_override("font_color",Color("9fc4d8"))
-	title_screen.composition.add_child(version)
+
+func open_deck_workspace() -> void:
+	if entering or mode!=Mode.TITLE or is_instance_valid(deck_workspace): return
+	shared_settings.welcome.hide();title_screen.hide()
+	deck_workspace=preload("res://scripts/battle/deck_workspace.gd").new()
+	add_child(deck_workspace)
+	deck_workspace.closed.connect(func() -> void:
+		deck_workspace.queue_free();deck_workspace=null
+		title_screen.show();title_screen.focus_preferred())

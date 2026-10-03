@@ -18,7 +18,7 @@ func run() -> void:
 	app.entry.decks.directory = base.path_join("decks")
 	app.entry.refresh_resume()
 	check(app.mode == app.Mode.TITLE and app.table_scene == null,"Title loads before any table or networking")
-	check(app.title_screen.composition.get_node("BuildVersion").text == preload("res://scripts/frontend/app_info.gd").LABEL,"Title version comes from central source")
+	check(app.updater.button.text.begins_with(preload("res://scripts/frontend/app_info.gd").LABEL),"Title version comes from central source")
 	check(app.entry.resume_button.disabled,"Resume is disabled with no saves")
 	check(app.shared_settings.welcome.visible,"First-run help opens")
 	await capture(base,"welcome_73")

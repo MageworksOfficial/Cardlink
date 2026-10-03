@@ -9,11 +9,12 @@ func _can_drop_data(_position: Vector2, data: Variant) -> bool:
 	return data is Dictionary and data.get("cardlink_instance") is String and controller.card_by_id(data.cardlink_instance) != null
 func _drop_data(point: Vector2, data: Variant) -> void:
 	var card: Control = controller.card_by_id(data.cardlink_instance)
-	controller.move_card(card, "battlefield")
-	card.position = point - card.size / 2
-	card.state.position = card.position
+	var ids: Array=controller.library_actions.hand_drag_ids(data.cardlink_instance)
+	if ids.is_empty(): ids=[data.cardlink_instance]
+	controller.library_actions.place_cards(ids,point-card.size/2,controller.library_actions.enter_face_down)
 
 func _gui_input(event: InputEvent) -> void:
+	if controller!=null and controller.manager.appearance!=null and controller.manager.appearance.input(event): accept_event();return
 	if controller != null and controller.manager.selection != null and controller.manager.selection.field_input(event):
 		accept_event()
 		return
@@ -21,7 +22,7 @@ func _gui_input(event: InputEvent) -> void:
 		controller.manager.extras.open_field(get_global_transform() * event.position)
 		accept_event()
 func _draw() -> void:
-	var extent: Vector2 = LOGICAL_SIZE
+	var extent: Vector2 = size
 	draw_rect(Rect2(Vector2.ZERO, extent), table_color)
 	draw_rect(Rect2(0, 0, extent.x, 130), Color("142330"))
 	draw_rect(Rect2(0, 1000, extent.x, 296), Color("162b32"))

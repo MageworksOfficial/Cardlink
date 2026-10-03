@@ -196,6 +196,7 @@ func receive(frame: Dictionary) -> void:
 				scan()
 				send_frame("resync", state)
 func submit(ops: Array) -> void:
+	if network.quiesced: return
 	if not enabled or applying or ops.is_empty(): return
 	request_sequence += 1
 	var action: Dictionary = {"action_id": Crypto.new().generate_random_bytes(16).hex_encode(), "sequence":request_sequence,"actor_player_id":local_id,"action_type":"batch","payload":ops}
@@ -262,7 +263,7 @@ func apply_action(action: Dictionary) -> void:
 					if old.owner == local_id and data.destination in ["hand", "library"] and not old.token:
 						if item.state.current_zone != data.destination:
 							table.match_controller.move_card(item, data.destination, data.top, "local")
-					else: table.match_controller.remove_card(item)
+					elif item.state.current_zone != "custom_pile": table.match_controller.remove_card(item)
 				state.cards.erase(data.id)
 				state.order.erase(data.id)
 				history("remove", actor, player_name(actor) + (" destroyed a token." if old.token else " removed a public card to " + data.destination + "."))
@@ -300,6 +301,7 @@ func apply_action(action: Dictionary) -> void:
 	applying = false
 	publish_counts.call_deferred()
 func publish_counts() -> void:
+	if network.quiesced: return
 	if not enabled or applying: return
 	# The owner supplies identity when either peer turns an unknown face-down card up.
 	for id: String in state.cards:
@@ -320,6 +322,7 @@ func publish_counts() -> void:
 		ops.append({"kind":"hand_public","data":{"player":local_id,"cards":captured.hands[local_id]}})
 	submit(ops)
 func scan() -> void:
+	if network.quiesced: return
 	if not enabled or applying or baseline.is_empty(): return
 	for card: Control in table.cards:
 		if card.dragging: return
@@ -367,10 +370,13 @@ func scan() -> void:
 	baseline = current
 	submit(ops)
 func capture_event(kind: String, payload: Dictionary) -> void:
+	if network.quiesced: return
 	if not enabled or applying: return
 	var message: String = ""
 	var actor: String = player_name(local_id)
 	match kind:
+		"loyalty": message = actor + " changed a Loyalty counter."
+		"mill_bottom": message = actor + " milled %d cards from bottom." % int(payload.get("count",0))
 		"face": message = actor + " changed a card face."
 		"dice": message = "%s rolled %dD%d → %s (total %d)" % [actor, payload.get("count",0),payload.get("sides",0),str(payload.get("values",[])),payload.get("total",0)]
 		"coin": message = actor + " flipped a coin → " + str(payload.get("side", ""))

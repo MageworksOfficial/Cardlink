@@ -1,0 +1,108 @@
+extends "res://scripts/tests/milestone_6b_test.gd"
+const Back = preload("res://scripts/battle/deck_back.gd")
+const Loyalty = preload("res://scripts/battle/loyalty.gd")
+func run() -> void:
+	root.size=Vector2i(1152,760);root.gui_embed_subwindows=true
+	var base: String=OS.get_cmdline_user_args()[0]
+	var prefs=preload("res://scripts/frontend/player_preferences.gd").new()
+	prefs.save_name("Saved Vex")
+	var stale=preload("res://scripts/frontend/player_preferences.gd").new()
+	prefs.save_name("Classroom Vex");stale.set_flag("test",true)
+	check(preload("res://scripts/frontend/player_preferences.gd").new().player_name()=="Classroom Vex","nickname reload and unrelated preference update preserve latest name")
+	var a: Control=await create_client(base.path_join("a"),"Private A",Color.CORNFLOWER_BLUE)
+	check(a.get_node("Network").display_name.text=="Classroom Vex","Host/Join nickname prefilled")
+	var m: Node=a.tabletop
+	var c: Node=m.match_controller
+	var deck: Dictionary=m.battle.reset.start.sources[0].deck.duplicate(true)
+	var blue: Dictionary={"type":"color","color":"#2468b4","preset":"","asset":""}
+	deck["deck_back"]=blue;c.load_deck(deck,false)
+	check(Back.valid(blue) and Back.texture(blue)!=null,"custom color back renders")
+	for name: String in Back.PRESETS:
+		check(Back.texture({"type":"preset","color":Back.PRESETS[name],"preset":name,"asset":""})!=null,"preset "+name)
+	check(Back.texture(Back.defaults())!=null,"default back")
+	var image := Image.create(900,300,false,Image.FORMAT_RGB8);image.fill(Color.MAGENTA);image.save_png(base.path_join("back.png"))
+	var stored: Dictionary=Back.import_image(base.path_join("back.png"))
+	check(not stored.has("error") and Image.load_from_file(Back.path(stored.get("hash",""))).get_size()==Vector2i(500,700),"custom image normalized and hash stored")
+	var missing: Dictionary={"type":"image","color":"#2468b4","preset":"","asset":"a".repeat(64)}
+	check(Back.texture(missing)!=null,"missing image uses colored fallback")
+	check(not Back.valid({"type":"image","color":"bad","preset":"","asset":"../../private"}),"invalid back path/config rejected")
+	var ds=preload("res://scripts/deck_storage.gd").new(base.path_join("decks"))
+	var saved: Dictionary=ds.save_deck(deck)
+	check(not saved.has("error") and ds.list_decks()[0].data.deck_back==blue,"saved deck retains back")
+	var order: Array=c.pile.order.duplicate()
+	c.library_actions.mill_bottom("local",2)
+	check(c.model.players.local.graveyard==order.slice(8) and c.pile.order==order.slice(0,8),"bottom mill keeps D then E append order")
+	check(c.library_actions.mill_bottom("local",999)==8 and c.library_actions.mill_bottom("local",1)==0,"oversized/empty bottom mill safe")
+	var card: Control=c.card_by_id(order[0]);c.move_card(card,"battlefield")
+	Loyalty.set_value(m,card,4);Loyalty.set_value(m,card,5);Loyalty.set_value(m,card,0)
+	check(card.state.counters.get("Loyalty")==0 and m.cards.has(card),"Loyalty zero retains card and badge")
+	var snapshot: Dictionary=m.persistence.capture_match()
+	check(not preload("res://scripts/match_snapshot.gd").restore(m,snapshot).has("error"),"back/start config and Loyalty save restore")
+	card=c.card_by_id(order[0]);check(card.state.counters.get("Loyalty")==0,"Loyalty restored")
+	Loyalty.remove(m,card);check(not card.state.counters.has("Loyalty"),"Loyalty remove")
+	c.library_actions.draw_n("local",2);c.change_life("local",-9);c.end_turn();m.create_token("Test","local","local");m.extras.create_counter(Vector2.ZERO)
+	var names: Array=[c.model.players.local.display_name,c.model.players.opponent.display_name]
+	var zones: int=m.zones.size()
+	m.battle.reset.offline()
+	check(c.pile.order.size()==10 and c.model.players.local.hand.is_empty() and c.model.players.local.graveyard.is_empty(),"offline reset reconstructs original composition")
+	check(c.model.players.local.life==40 and c.model.turn_number==1 and c.model.history.is_empty(),"offline reset life turn history")
+	check(m.extras.counters.is_empty() and m.cards.all(func(x: Control) -> bool: return not x.state.is_token),"offline reset clears tokens/counters")
+	check(m.zones.size()==zones and c.model.players.local.deck_back==blue and c.model.players.local.display_name==names[0],"offline reset preserves zones nickname back")
+	var b: Control=await create_client(base.path_join("b"),"Private B",Color.CORAL)
+	var cb: Node=b.tabletop.match_controller
+	var na: Node=a.get_node("Network").network;var nb: Node=b.get_node("Network").network
+	var ra: Node=a.get_node("Network").gameplay;var rb: Node=b.get_node("Network").gameplay
+	var port: int=randi_range(34000,44000)
+	na.host_game(port,"Mattamn","127.0.0.1");nb.join_game("127.0.0.1",port,"Picklenick99")
+	check(await wait_for(func() -> bool: return na.session.state=="connected" and nb.session.state=="connected"),"two clients connected")
+	check(preload("res://scripts/frontend/player_preferences.gd").new().player_name() in ["Mattamn","Picklenick99"],"successful connection persists edited nickname")
+	ra.start_public();rb.start_public()
+	check(await wait_for(func() -> bool: return ra.enabled and rb.enabled),"shared match starts")
+	await settle()
+	check(b.tabletop.deck_backs.remote.library==blue,"remote library receives cosmetic configuration only")
+	var xr: RefCounted=m.battle.reset;var yr: RefCounted=b.tabletop.battle.reset
+	m.battle.nickname("Vex");await settle()
+	check(nb.session.remote_peer.display_name=="Vex","live nickname update")
+	var session_id: String=na.session.session_id
+	c.library_actions.draw_n("local",3);cb.library_actions.draw_n("local",2);c.change_life("local",-4);await settle()
+	var old_id: String=c.model.players.local.hand[0]
+	var old_frame: Dictionary={"type":"game","protocol":1,"session_id":session_id,"mode":"resync","sequence":ra.committed,"data":ra.state.duplicate(true)}
+	xr.request();await settle();check(yr.phase=="received" and yr.prompt.dialog_text.contains("Vex"),"reset requires remote approval with nickname")
+	yr.decline();await settle();check(xr.phase.is_empty() and c.model.players.local.hand.size()==3,"decline retains current match")
+	wire.clear();xr.request();await settle();yr.accept()
+	check(await wait_for(func() -> bool: return xr.phase.is_empty() and yr.phase.is_empty() and not xr.checkpoint and not yr.checkpoint),"online reset accepted and finished")
+	check(na.session.session_id==session_id and nb.session.state=="connected","reset retains connection/session")
+	check(c.pile.order.size()==10 and cb.pile.order.size()==10 and c.model.players.local.hand.is_empty() and cb.model.players.local.hand.is_empty(),"both private libraries rebuilt and hands cleared")
+	check(c.card_by_id(old_id)==null and na.match_epoch==nb.match_epoch and not na.match_epoch.is_empty(),"fresh instances and matching epoch")
+	check(c.model.players.local.life==40 and cb.model.players.opponent.life==40 and ra.state.history.is_empty(),"online life/history reset")
+	var signature: String=JSON.stringify(rb.state);nb.receive(old_frame)
+	check(JSON.stringify(rb.state)==signature,"old-epoch action ignored")
+	var reset_wire: String=JSON.stringify(wire.filter(func(f: Dictionary) -> bool: return f.type=="battle" and f.kind.begins_with("reset_")))
+	check(not reset_wire.contains("Private A") and not reset_wire.contains("Private B") and not reset_wire.contains(c.pile.order[0]),"reset messages contain no hidden identity/order")
+	xr.request();yr.request()
+	check(await wait_for(func() -> bool: return xr.phase.is_empty() and yr.phase.is_empty() and not xr.checkpoint and not yr.checkpoint),"simultaneous requests converge once")
+	c.library_actions.mill_bottom("local",2);await settle()
+	check(c.pile.order.size()==8 and cb.hidden_count("opponent","library")==8 and cb.model.players.opponent.graveyard.size()==2,"bottom mill public moves and counts synchronize")
+	card=c.card_by_id(c.model.players.local.graveyard[0]);c.move_card(card,"battlefield");Loyalty.set_value(m,card,7);await settle()
+	check(cb.card_by_id(card.state.match_instance_id).state.counters.get("Loyalty")==7,"Loyalty public sync")
+	xr.request();await settle();na.disconnect_session();await settle()
+	check(xr.phase.is_empty() and yr.phase.is_empty() and not xr.guarded and not yr.guarded,"disconnect during request cancels safely")
+	ra.recovery.reconnect();rb.recovery.reconnect()
+	check(await wait_for(func() -> bool: return ra.recovery.authenticated and rb.recovery.authenticated and not ra.recovery.suspended and not rb.recovery.suspended),"authenticated reconnect after request")
+	check(cb.card_by_id(card.state.match_instance_id).state.counters.get("Loyalty")==7,"Loyalty survives reconnect")
+	var cut: Array=[true]
+	na.message_sent.connect(func(f: Dictionary) -> void:
+		if cut[0] and f.type=="battle" and f.kind=="reset_prepare": cut[0]=false;na.disconnect_session())
+	xr.request();await settle();yr.accept();await settle()
+	check(xr.guarded,"interrupted preparation freezes the rebuilt side")
+	ra.recovery.reconnect();rb.recovery.reconnect()
+	check(await wait_for(func() -> bool: return ra.recovery.authenticated and rb.recovery.authenticated and xr.guarded and yr.guarded),"reconnect verifies identities and guards both clients")
+	check(not ra.enabled and not rb.enabled,"interrupted reset cannot silently resume divergent games")
+	xr.request();await settle();yr.accept()
+	check(await wait_for(func() -> bool: return not xr.guarded and not yr.guarded and ra.enabled and rb.enabled and not xr.checkpoint and not yr.checkpoint),"new bilateral reset recovers interrupted rematch")
+	check(c.pile.order.size()==10 and cb.pile.order.size()==10 and na.match_epoch==nb.match_epoch,"recovered rematch has matching generation and complete decks")
+	ra.recovery.leave();rb.recovery.leave();await settle()
+	check(na.match_epoch.is_empty() and nb.match_epoch.is_empty() and not na.quiesced and not nb.quiesced,"explicit Leave Match clears rematch generation for future sessions")
+	a.queue_free();b.queue_free();await settle()
+	print("BATTLE CHECKS ",checks," FAILURES ",failures);quit(0 if failures==0 else 1)
+

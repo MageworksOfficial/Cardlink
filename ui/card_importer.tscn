@@ -4,7 +4,7 @@
 [ext_resource type="PackedScene" path="res://ui/crop_preview.tscn" id="2"]
 
 [node name="CardImporter" type="Window"]
-title = "Import Card"
+title = "Add Custom Card"
 size = Vector2i(900, 640)
 min_size = Vector2i(680, 580)
 visible = false
@@ -27,8 +27,12 @@ theme_override_constants/separation = 8
 
 [node name="Heading" type="Label" parent="Margin/Layout"]
 layout_mode = 2
-text = "Import Card • locked 5:7 crop"
+text = "ADD CUSTOM CARD"
 theme_override_font_sizes/font_size = 22
+
+[node name="Subtitle" type="Label" parent="Margin/Layout"]
+layout_mode = 2
+text = "Import your own card image into CardLink. · Locked 5:7 crop"
 
 [node name="SourceRow" type="HBoxContainer" parent="Margin/Layout"]
 layout_mode = 2

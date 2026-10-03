@@ -9,16 +9,24 @@ var additive: bool = false
 var moving: bool = false
 var origins: Dictionary = {}
 var drag_start: Vector2
+var arrange: RefCounted
 var bulk: PopupMenu
 const ACTIONS = ["graveyard", "exile", "hand", "top", "bottom", "local", "opponent", "tap", "untap", "delete"]
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	z_index = 90
 	bulk = PopupMenu.new()
-	add_child(bulk)
+	# Screen-fixed parent: embedded popups must not inherit battlefield zoom.
+	manager.controls.add_child(bulk)
+	bulk.min_size=Vector2i(380,0)
+	bulk.add_theme_font_size_override("font_size",18)
+	bulk.add_theme_constant_override("v_separation",10)
 	for caption: String in ["Move All to Owner's Graveyard", "Move All to Owner's Exile", "Move All to Owner's Hand", "Put All on Owner's Library Top", "Put All on Owner's Library Bottom", "Controller: Local player", "Controller: Opponent", "Tap All", "Untap All", "Delete (cards → owner's graveyard)"]:
 		bulk.add_item(caption)
-	bulk.id_pressed.connect(func(index: int) -> void: apply_batch(ACTIONS[index], ids.duplicate()))
+	bulk.id_pressed.connect(func(index: int) -> void:
+		if index >= 0 and index < ACTIONS.size(): apply_batch(ACTIONS[index], ids.duplicate()))
+	arrange = preload("res://scripts/usability/tabletop_arrange.gd").new(self)
+	arrange.setup()
 func object_id(item: Control) -> String:
 	return item.state.match_instance_id if item in manager.cards else item.instance_id
 func resolve(id: String) -> Control:
@@ -26,9 +34,42 @@ func resolve(id: String) -> Control:
 	return card if card != null else manager.extras.counter_by_id(id)
 func eligible(item: Control) -> bool:
 	return is_instance_valid(item) and item.visible and (not item in manager.cards or not item.state.current_zone in ["hand", "library"])
+func selectable(item: Control) -> bool:
+	if not is_instance_valid(item): return false
+	if item in manager.cards and item.state.current_zone=="hand":
+		var c: Node=manager.match_controller
+		return manager.active and item.state.zone_player_id==c.active_hand_player() and not c.hands_hidden and c.hand_open
+	return eligible(item)
+func toggle(item: Control) -> void:
+	if not selectable(item): return
+	var id: String=object_id(item)
+	if ids.has(id): ids.erase(id)
+	else: ids.append(id)
+	manager.selected_card=null
+	paint();manager.controls.update_selection()
+func open_bulk(source: Control, point: Vector2) -> void:
+	arrange.update_menu()
+	manager.controls.close_panels()
+	manager.match_controller.hide_preview()
+	# Translate through desktop coordinates for a detached hand window too.
+	var position_in_root: Vector2=manager.get_viewport().get_screen_transform().affine_inverse() * (source.get_screen_transform() * point)
+	bulk.reset_size()
+	bulk.size.x=maxi(380,bulk.size.x)
+	var extent: Vector2=manager.get_viewport().get_visible_rect().size
+	bulk.position=Vector2i(position_in_root.clamp(Vector2.ZERO,(extent-Vector2(bulk.size)).max(Vector2.ZERO)))
+	bulk.popup()
+func hand_input(card: Control, source: Control, event: InputEvent) -> bool:
+	if not event is InputEventMouseButton or not event.pressed: return false
+	var id: String=card.state.match_instance_id
+	if event.button_index==MOUSE_BUTTON_LEFT and (event.ctrl_pressed or event.shift_pressed):
+		toggle(card);return true
+	if ids.has(id) and ids.size()>1:
+		if event.button_index==MOUSE_BUTTON_RIGHT: open_bulk(source,event.position);return true
+		if event.button_index==MOUSE_BUTTON_LEFT: return true
+	return false
 func set_single(card: Control) -> void:
 	ids.clear()
-	if eligible(card):
+	if selectable(card):
 		ids.append(object_id(card))
 	paint()
 func clear() -> void:
@@ -43,7 +84,7 @@ func paint() -> void:
 func _process(_delta: float) -> void:
 	var kept: Array[String] = []
 	for id: String in ids:
-		if eligible(resolve(id)):
+		if selectable(resolve(id)):
 			kept.append(id)
 	if kept != ids:
 		ids = kept
@@ -53,6 +94,7 @@ func _process(_delta: float) -> void:
 		marquee = false
 		moving = false
 		bulk.hide()
+		arrange.menu.hide()
 	queue_redraw()
 func bounds(item: Control) -> Rect2:
 	if item in manager.cards:
@@ -101,18 +143,11 @@ func object_input(item: Control, event: InputEvent) -> bool:
 	var id: String = object_id(item)
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_RIGHT and ids.has(id) and ids.size() > 1:
-			bulk.position = Vector2i(item.get_global_transform() * event.position)
-			bulk.popup()
+			open_bulk(item,event.position)
 			return true
 		if event.button_index == MOUSE_BUTTON_LEFT and not event.double_click:
 			if event.ctrl_pressed or event.shift_pressed:
-				if ids.has(id):
-					ids.erase(id)
-				else:
-					ids.append(id)
-				manager.selected_card = null
-				paint()
-				manager.controls.update_selection()
+				toggle(item)
 				return true
 			if ids.has(id) and ids.size() > 1:
 				moving = true
@@ -164,7 +199,7 @@ func apply_batch(action: String, instance_ids: Array) -> void:
 	var applied: Array[String] = []
 	for id: String in ordered:
 		var item: Control = resolve(id)
-		if not eligible(item):
+		if not selectable(item):
 			continue
 		if not item in manager.cards:
 			if action == "delete":

@@ -23,6 +23,7 @@ func apply_view() -> void:
 		manager.match_controller.pile_view.refresh()
 		manager.match_controller.opponent_pile.refresh()
 	for zone: Control in manager.zones: zone.update_title()
+	if manager.custom_table != null: manager.custom_table.refresh_presentation()
 	for card: Control in manager.cards:
 		card.hover_preview.hide()
 func over_field(point: Vector2) -> bool:

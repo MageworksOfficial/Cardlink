@@ -2,6 +2,7 @@ extends TextureRect
 var instance_id: String
 var controller: Node
 var publicly_revealed: bool = false
+var selection_click: bool = false
 func _ready() -> void:
 	if publicly_revealed:
 		var badge := EyeBadge.new()
@@ -26,9 +27,10 @@ func _process(_delta: float) -> void:
 	queue_redraw()
 func _draw() -> void:
 	var selected: Control = controller.manager.selected_card
-	if is_instance_valid(selected) and selected.state.match_instance_id == instance_id:
+	if (controller.manager.selection!=null and controller.manager.selection.ids.has(instance_id)) or (is_instance_valid(selected) and selected.state.match_instance_id == instance_id):
 		draw_rect(Rect2(Vector2.ONE, size - Vector2(2, 2)), Color.GOLD, false, 3)
 func _get_drag_data(_point: Vector2) -> Variant:
+	if selection_click or Input.is_key_pressed(KEY_CTRL) or Input.is_key_pressed(KEY_SHIFT): return null
 	if controller.hand_window != null and controller.hand_window.detached:
 		return null
 	var icon := TextureRect.new()
@@ -37,10 +39,13 @@ func _get_drag_data(_point: Vector2) -> Variant:
 	icon.custom_minimum_size = Vector2(80, 112)
 	set_drag_preview(icon)
 	controller.hide_preview()
-	return {"cardlink_instance": instance_id}
+	return {"cardlink_instance": instance_id,"cardlink_instances":controller.library_actions.hand_drag_ids(instance_id)}
 var held: bool = false
 var press_point: Vector2
 func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT:
+		selection_click=event.pressed and (event.ctrl_pressed or event.shift_pressed)
+		if selection_click: held=false;return
 	if controller.hand_window == null or not controller.hand_window.detached: return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		held = event.pressed

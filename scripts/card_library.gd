@@ -6,6 +6,8 @@ signal place_requested(record: Dictionary)
 const Loader = preload("res://scripts/library_loader.gd")
 const Editor = preload("res://scripts/library_metadata_editor.gd")
 const Thumbnail = preload("res://ui/library_thumbnail.tscn")
+var custom_import_button: Button
+var empty_help: VBoxContainer
 var face_tools: RefCounted
 var loader: Loader = Loader.new()
 var records: Array[Dictionary] = []
@@ -52,14 +54,15 @@ func _ready() -> void:
 	title.add_theme_font_size_override("font_size", 24)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(title)
-	action(toolbar, "Import Card", func() -> void: import_requested.emit())
-	action(toolbar, "Import ZIP Deck", func() -> void: archive_requested.emit())
+	var optional := HFlowContainer.new()
+	custom_import_button = action(optional, "+ Add Custom Card", func() -> void: import_requested.emit())
+	custom_import_button.tooltip_text = "Import a card image from your computer."
+	action(optional, "Import ZIP Deck", func() -> void: archive_requested.emit()).tooltip_text = "Create a deck from a folder/archive of card images."
 	action(toolbar, "Refresh", refresh)
 	action(toolbar, "Clean unused images…", request_cleanup)
-	var optional := HBoxContainer.new()
 	layout.add_child(optional)
-	action(optional, "Online Search / MTG Catalog", func() -> void: preload("res://scripts/integrations/integration_hub.gd").open(self,0))
-	action(optional, "Import Decklist", func() -> void: preload("res://scripts/integrations/integration_hub.gd").open(self,1))
+	action(optional, "Online Card Search", func() -> void: preload("res://scripts/integrations/integration_hub.gd").open(self,0)).tooltip_text = "Search an optional online card provider."
+	action(optional, "Import Decklist", func() -> void: preload("res://scripts/integrations/integration_hub.gd").open(self,1)).tooltip_text = "Build a deck from a pasted card list."
 	var filters := HBoxContainer.new()
 	layout.add_child(filters)
 	query = LineEdit.new()
@@ -76,6 +79,16 @@ func _ready() -> void:
 	sort_order.add_item("Newest first")
 	sort_order.item_selected.connect(func(_index: int) -> void: rebuild_grid())
 	filters.add_child(sort_order)
+	empty_help = VBoxContainer.new()
+	layout.add_child(empty_help)
+	var empty_label := Label.new()
+	empty_label.text = "YOUR CARD LIBRARY IS EMPTY\nAdd your own card image or use an optional online provider."
+	empty_help.add_child(empty_label)
+	var empty_actions := HBoxContainer.new()
+	empty_help.add_child(empty_actions)
+	action(empty_actions,"+ Add Custom Card",func() -> void: import_requested.emit())
+	action(empty_actions,"Online Card Search",func() -> void: preload("res://scripts/integrations/integration_hub.gd").open(self,0))
+	empty_help.hide()
 	var body := HBoxContainer.new()
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 18)
@@ -127,6 +140,7 @@ func _ready() -> void:
 	cleanup_dialog.confirmed.connect(confirm_cleanup)
 	add_child(cleanup_dialog)
 	select_record("")
+	preload("res://scripts/collection_events.gd").shared.collection_changed.connect(collection_updated)
 
 func open_library() -> void:
 	show()
@@ -167,6 +181,7 @@ func rebuild_grid() -> void:
 	resize_grid()
 	select_record(selected_path if selection_visible else "")
 	status.text = "%d of %d definitions" % [displayed.size(), records.size()]
+	empty_help.visible = records.is_empty()
 	if records.is_empty():
 		status.text = "Your library is empty. Import a card to get started."
 	elif displayed.is_empty():
@@ -229,3 +244,9 @@ func place_selected() -> void:
 		if record["path"] == selected_path:
 			place_requested.emit(record)
 			return
+
+func collection_updated(directory: String) -> void:
+	if directory != preload("res://scripts/collection_events.gd").key(loader.storage.directory): return
+	var previous_scroll: int = scroll.scroll_vertical
+	refresh()
+	scroll.set_deferred("scroll_vertical",previous_scroll)

@@ -1,6 +1,9 @@
 extends RefCounted
 signal changed
 const ACTIONS = {
+	"reset_match":["Reset Match",KEY_R | KEY_MASK_CTRL | KEY_MASK_ALT | KEY_MASK_SHIFT,"Gameplay"],
+	"background_edit":["Background Edit Mode",KEY_B | KEY_MASK_CTRL,"View"],
+	"play_top":["Top card to battlefield",KEY_D | KEY_MASK_CTRL,"Gameplay"],
 	"draw":["Draw",KEY_D,"Gameplay"], "discard":["Discard selected hand card",KEY_F,"Gameplay"],
 	"shuffle":["Shuffle",KEY_S,"Gameplay"], "token":["Create / Duplicate Token",KEY_T,"Gameplay"],
 	"counter":["Counter Action",KEY_C,"Gameplay"], "graveyard":["Open / Move to Graveyard",KEY_G,"Gameplay"],
@@ -12,6 +15,7 @@ const ACTIONS = {
 	"pan_up":["Pan Up",KEY_UP,"View"], "pan_down":["Pan Down",KEY_DOWN,"View"],
 	"hand":["Open Hand",KEY_H,"Interface"], "library":["Open Library",KEY_B,"Interface"],
 	"history":["Match History",KEY_M,"Interface"], "save":["Save Match",KEY_S | KEY_MASK_CTRL,"Interface"],
+	"table_builder":["Toggle Table Builder",0,"Interface"],
 	"mode":["Online / Playtest",KEY_P,"Interface"],
 	"tap":["Tap / Untap Selected",KEY_Q,"Gameplay"], "perspective":["Switch Offline Perspective",KEY_V,"View"], "card_face":["Change Card Face",0,"Gameplay"]}
 var path: String
@@ -24,6 +28,9 @@ func _init(file: String = "user://input_bindings.cfg") -> void:
 		for id: String in ACTIONS:
 			var value: Variant = config.get_value("keys",id,keys[id])
 			if value is int and value >= 0: keys[id] = value
+	# Upgrade the previous default while retaining other custom bindings.
+	if keys.reset_match == (KEY_R | KEY_MASK_CTRL | KEY_MASK_ALT):
+		keys.reset_match = ACTIONS.reset_match[1]
 	# A corrupted preference cannot create ambiguous shortcuts.
 	var used: Dictionary = {}
 	for id: String in keys:
@@ -62,7 +69,7 @@ func action_for(event: InputEventKey) -> String:
 			if id.begins_with("pan_") and keys[id] != 0 and keys[id] == (code & ~KEY_MASK_SHIFT): return id
 	return ""
 func help_text() -> String:
-	var result: String = "Mouse\nLeft drag — Move · Empty drag — Multi-select\nRight click — Actions · Double click battlefield card — Tap / Untap\nWheel — Zoom · Middle drag — Pan\n"
+	var result: String = "Ctrl+F — Find cards and functions (offline or online)\n\nMouse\nLeft drag — Move · Empty drag — Multi-select\nCtrl/Shift-click — Add/remove battlefield or hand objects\nRight click — Actions · Double click battlefield card — Tap / Untap\nWheel — Zoom · Middle drag — Pan\nMulti-select battlefield objects → Right-click → Arrange\nStack · Fan · Horizontal · Vertical · Distribute · Spread\n"
 	for group: String in ["Gameplay","View","Interface"]:
 		result += "\n"+group+"\n"
 		for id: String in ACTIONS:

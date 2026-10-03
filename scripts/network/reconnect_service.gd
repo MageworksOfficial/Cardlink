@@ -68,6 +68,8 @@ func leave() -> void:
 		return
 	continue_offline()
 	context.clear()
+	router.network.match_epoch="";router.network.reset_pending=false;router.network.quiesced=false
+	if router.table!=null and router.table.battle!=null: router.table.battle.reset.leave()
 	suspended = false
 	say("Left multiplayer. Local match remains open.")
 func fail(message: String) -> void:
@@ -110,12 +112,15 @@ func receive(f: Dictionary) -> void:
 				return
 			authenticated = true
 			say("Reconnected. Checking match state...")
+			if reset_guarded(): router.table.battle.reset.guard();reconnecting=false
 			send("proof",{"match":context.match,"nonce":d.nonce,"proof":proof(client_nonce+":"+d.nonce,"guest"),"revision":router.committed})
 		elif f.kind == "proof" and context.role == "host":
-			if d.nonce != challenge or not verifies(d.proof,proof(client_nonce+":"+challenge,"guest")) or int(d.revision) > router.committed:
+			if d.nonce != challenge or not verifies(d.proof,proof(client_nonce+":"+challenge,"guest")) or (int(d.revision) > router.committed and not reset_guarded()):
 				fail("Saved peer identity or public revision could not be verified.")
 				return
 			authenticated = true
+			if reset_guarded():
+				router.table.battle.reset.guard();reconnecting=false;say("Reconnected. Both players must approve Reset Match again.");return
 			router.enabled = true
 			router.opted_in = true
 			router.session_id = router.network.session.session_id
@@ -124,7 +129,7 @@ func receive(f: Dictionary) -> void:
 			say("Synchronizing public tabletop...")
 			if not send("snapshot",{"revision":router.committed,"state":router.state}): fail("Public state could not fit or be sent safely.")
 		return
-	if not authenticated or context.is_empty(): return
+	if not authenticated or context.is_empty() or reset_guarded(): return
 	match f.kind:
 		"snapshot":
 			if router.is_host() or int(d.revision) < router.committed: return
@@ -196,3 +201,6 @@ func _process(_delta: float) -> void:
 	if checking_until > 0 and now() > checking_until:
 		checking_until = 0
 		say("Public resync did not finish in time. Retry or reconnect; local state is preserved.")
+
+func reset_guarded() -> bool:
+	return router.table!=null and router.table.battle!=null and (router.table.battle.reset.guarded or router.network.remote_reset_pending)

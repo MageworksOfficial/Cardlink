@@ -3,6 +3,10 @@ const CardScene = preload("res://scenes/card.tscn")
 const ZoneScene = preload("res://scenes/tabletop_zone.tscn")
 const Controls = preload("res://scripts/tabletop_controls.gd")
 var deck_preferences = preload("res://scripts/usability/deck_preferences.gd").new()
+var appearance: Node
+var battle: Node
+var deck_backs: Node
+var custom_table: Node
 var perspective: Node
 var organization: RefCounted
 var table_preferences = preload("res://scripts/usability/table_preferences.gd").new()
@@ -66,6 +70,9 @@ func setup() -> void:
 	view = preload("res://scripts/tabletop_view.gd").new()
 	view.manager = self
 	add_child(view)
+	deck_backs = preload("res://scripts/battle/back_presentation.gd").new()
+	deck_backs.manager = self
+	add_child(deck_backs)
 	match_controller = preload("res://scripts/match_controller.gd").new()
 	match_controller.manager = self
 	add_child(match_controller)
@@ -92,6 +99,13 @@ func setup() -> void:
 	perspective = preload("res://scripts/usability/offline_perspective.gd").new()
 	perspective.manager = self
 	add_child(perspective)
+	custom_table = preload("res://scripts/custom_table/table_builder.gd").new()
+	custom_table.manager = self
+	add_child(custom_table)
+	battle=preload("res://scripts/battle/battle_session.gd").new()
+	battle.manager=self
+	add_child(battle)
+	appearance=preload("res://scripts/appearance/table_appearance.gd").new();appearance.manager=self;add_child(appearance)
 	organization.reset_layout()
 	var feedback := preload("res://scripts/usability/table_feedback.gd").new()
 	feedback.manager = self
@@ -110,7 +124,7 @@ func register_card(card: Control) -> void:
 	card.size = Vector2(100, 140)
 	card.card_image.pivot_offset = card.size / 2
 	cards.append(card)
-	card.card_back.texture = backs.texture(str(card.state.custom_metadata.get("card_back_id", "")))
+	card.card_back.texture = preload("res://scripts/battle/deck_back.gd").for_card(card,backs)
 	card.actions_requested.connect(func(item: Control) -> void:
 		select_card(item)
 		controls.open_card_actions())

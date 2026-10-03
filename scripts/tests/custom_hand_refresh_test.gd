@@ -1,0 +1,90 @@
+extends SceneTree
+var failures: int = 0
+func _initialize() -> void: run.call_deferred()
+func check(ok: bool, caption: String) -> void:
+	print(("PASS " if ok else "FAIL ")+caption)
+	if not ok: failures += 1
+func settle() -> void:
+	for i: int in 8: await process_frame
+func capture(name: String) -> void:
+	if DisplayServer.get_name() == "headless" or OS.get_cmdline_user_args().is_empty(): return
+	await RenderingServer.frame_post_draw
+	root.get_texture().get_image().save_png(OS.get_cmdline_user_args()[0].path_join(name+".png"))
+func run() -> void:
+	root.size = Vector2i(1152,648)
+	root.gui_embed_subwindows = true
+	var app: Control = load("res://scenes/application_shell.tscn").instantiate()
+	root.add_child(app)
+	await settle()
+	app.shared_settings.welcome.hide()
+	app.choose_table(app.Mode.OFFLINE_PLAYTEST)
+	app.table_chosen(true)
+	await create_timer(0.6).timeout
+	await settle()
+	var b: Node = app.table_scene.tabletop.custom_table
+	var m: Node = b.manager
+	var c: Node = m.match_controller
+	var pile: Dictionary = b.add_component("shared_deck")
+	b.set_primary(pile.id)
+	m.layout.set_edit_mode(false)
+	var image := Image.create(75,105,false,Image.FORMAT_RGB8)
+	image.fill(Color.CORAL)
+	var stored: Dictionary = b.assets.store(image.save_png_to_buffer())
+	var record: Dictionary = {"name":"Hand Fixture","image_path":b.assets.path(stored.hash),"metadata":{"card_id":"hand_fixture"},"thumbnail":ImageTexture.create_from_image(image)}
+	for i: int in 12: b.put_card(m.spawn_definition(record,false).card,pile.id)
+	check(not c.hand.visible,"blank custom table has no unnecessary empty hand")
+	b.draw_active()
+	await settle()
+	check(c.model.players.local.hand.size() == 1,"draw moves a real card into P1 hand")
+	check(c.hand.is_visible_in_tree() and c.hand.row.get_child_count() == 1,"first drawn card appears without a Hand component or X")
+	await capture("first-draw-without-X")
+	check(c.hand.row.get_child(0).size.x > 0 and c.hand.row.get_child(0).texture != null,"drawn card has visible size and artwork")
+	c.refresh()
+	m.view.apply_view()
+	await settle()
+	check(c.hand.is_visible_in_tree(),"hand stays visible through refresh and camera update")
+	b.draw_active()
+	await settle()
+	check(c.hand.is_visible_in_tree() and c.hand.row.get_child_count() == 2,"second draw displays immediately")
+	m.shortcuts.toggle_hands()
+	check(not c.hand.visible and not c.opponent_hand.visible,"X intentionally hides both hands")
+	b.draw_active()
+	check(not c.hand.visible,"drawing respects intentionally hidden hands")
+	m.shortcuts.toggle_hands()
+	c.refresh()
+	check(c.hand.visible and c.hand.row.get_child_count() == 3,"X restore survives the next refresh")
+	c.model.active_player = "opponent"
+	b.draw_active()
+	await settle()
+	check(c.opponent_hand.visible and c.opponent_hand.cards_row.get_child_count() == 1,"opposite-seat draw shows in far hand without changing perspective")
+	m.perspective.switch_to("opponent",false,false)
+	await settle()
+	check(c.hand.visible and c.hand.row.get_child_count() == 1,"perspective switch shows P2 hand immediately")
+	check(c.opponent_hand.visible and c.opponent_hand.cards_row.get_child_count() == 3,"P1 hand remains on the far side")
+	b.draw_active()
+	check(c.hand.visible and c.hand.row.get_child_count() == 2,"drawing after perspective switch refreshes the correct hand")
+	await settle()
+	await capture("player-two-draw-without-X")
+	var hand: Dictionary = b.add_component("hand","player_2")
+	b.update_component(hand.id,{"hidden":true})
+	check(not c.hand.visible,"explicitly hidden Hand component remains hidden")
+	b.update_component(hand.id,{"hidden":false})
+	check(c.hand.visible,"showing Hand component restores cards")
+	b.remove_component(hand.id)
+	check(c.hand.visible,"removing visual Hand component never strands drawn cards")
+	c.hand_window.open_hand()
+	await settle()
+	b.draw_active()
+	await settle()
+	check(c.hand_window.window.visible and c.hand.is_visible_in_tree() and c.hand.row.get_child_count() == 3,"detached hand also displays the next draw")
+	c.hand_window.restore_hand()
+	check(c.hand.visible,"returning detached hand keeps its cards visible")
+	var saved: Dictionary = m.persistence.capture_match()
+	check(not m.persistence.restore_match(saved).has("error"),"custom match restores successfully")
+	await settle()
+	check(c.hand.visible and c.hand.row.get_child_count() > 0,"restored drawn hand appears without X")
+	print("CUSTOM HAND REFRESH FAILURES: ",failures)
+	app.dispose_table()
+	app.queue_free()
+	await settle()
+	quit(0 if failures == 0 else 1)

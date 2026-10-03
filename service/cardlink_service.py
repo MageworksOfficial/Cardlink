@@ -1,9 +1,11 @@
 """Ephemeral rendezvous and validated, non-persistent gameplay relay. Python standard library."""
+from update_manifest import UpdateManifest
 import argparse
 import os
 import logging
 import signal
 from relay_protocol import decode, MAX_FRAME
+from save_state_route import SaveRoute
 import asyncio
 import collections
 import ipaddress
@@ -31,8 +33,9 @@ def version(data):
 
 
 class Rooms:
-    def __init__(self, relay_port=8788, tls=False, ttl=20, clock=time.monotonic, protocol=1, max_rooms=200, max_age=14400, relay_host=""):
+    def __init__(self, relay_port=8788, tls=False, ttl=20, clock=time.monotonic, protocol=1, max_rooms=200, max_age=14400, relay_host="", save_state_version=3):
         self.protocol = protocol
+        self.save_state_version = save_state_version
         self.max_rooms = max_rooms
         self.max_age = max_age
         self.relay_host = relay_host
@@ -75,7 +78,7 @@ class Rooms:
 
     def view(self, room):
         return {key: room[key] for key in ('code', 'session_id', 'protocol', 'app_version', 'state', 'mode', 'addresses', 'port')} | {
-            'guest_joined': bool(room['guest_token']), 'relay_port': self.relay_port, 'relay_tls': self.tls, 'relay_host': self.relay_host}
+            'guest_joined': bool(room['guest_token']), 'relay_port': self.relay_port, 'relay_tls': self.tls, 'relay_host': self.relay_host, 'save_state_version': self.save_state_version, 'save_peers': room.get('save_peers',{})}
 
     def request(self, action, data):
         self.sweep()
@@ -109,6 +112,12 @@ class Rooms:
             room = dict(data, code=code, state='waiting', mode='direct', host_token=secrets.token_hex(16), guest_token='', join_key=secrets.token_hex(16), born=self.clock(), host_seen=self.clock(), guest_seen=self.clock(), connected=set())
             self.rooms[code] = room
             return self.view(room) | dict(token=room['host_token'], join_key=room['join_key'])
+        if action == 'save_capability':
+            exact(data, 'code token version')
+            room, role = self.authenticate(data)
+            if self.save_state_version!=3 or type(data['version']) is not int or data['version']!=3: raise ServiceError('invalid_request')
+            room.setdefault('save_peers',{})[role]=3
+            return self.view(room)
         if action == 'lookup':
             exact(data, 'code')
             room = self.get(data['code'])
@@ -130,6 +139,7 @@ class Rooms:
                 if not room.get('recovering', False):
                     room.update(session_id=secrets.token_hex(16), mode='relay', state='connecting', recovering=True)
                     room['connected'].clear()
+                    room.setdefault('save_peers',{}).clear()
                 room[role + '_seen'] = self.clock()
                 return self.view(room)
             if action == 'close':
@@ -157,14 +167,16 @@ class Rooms:
 
 
 class Server:
-    def __init__(self, rooms, traffic_limit=1073741824, idle_timeout=30):
+    def __init__(self, rooms, traffic_limit=1073741824, idle_timeout=30, update_manifest=None):
         self.rooms = rooms
+        self.updates = UpdateManifest(update_manifest)
         self.traffic_limit = traffic_limit
         self.idle_timeout = idle_timeout
         self.relay_active = 0
         self.rates = {}
         self.pairs = {}
         self.relay_ready = {}
+        self.save_routes = {}
         self.active = 0
 
     async def http(self, reader, writer):
@@ -182,7 +194,8 @@ class Server:
             headers = dict(line.split(':', 1) for line in lines[1:] if ':' in line)
             headers = {k.lower(): v.strip() for k, v in headers.items()}
             length = int(headers.get('content-length', '0'))
-            if method != 'POST' or not path.startswith('/v1/') or not 0 <= length <= 4096 or 'transfer-encoding' in headers:
+            update_request = method == 'GET' and path == '/v1/update' and length == 0
+            if (not update_request and (method != 'POST' or not path.startswith('/v1/'))) or not 0 <= length <= 4096 or 'transfer-encoding' in headers:
                 raise ServiceError('invalid_request')
             now = time.monotonic()
             ip = writer.get_extra_info('peername')[0]
@@ -196,16 +209,20 @@ class Server:
             if len(rate) >= 180:
                 raise ServiceError('service_busy')
             rate.append(now)
-            data = json.loads(await asyncio.wait_for(reader.readexactly(length), 5))
-            action = path[4:]
-            previous = self.rooms.rooms.get(data.get('code'), {}).get('session_id') if isinstance(data,dict) else None
-            result = self.rooms.request(action, data)
-            if action == 'resume' and result.get('session_id') != previous:
-                old_pair = self.pairs.pop(data['code'], {})
-                self.relay_ready.pop(data['code'], None)
-                for _, partner in list(old_pair.values()): partner.close()
-            if action in ('create','join','close','resume'):
-                logging.info('room %s', action)
+            if update_request:
+                result = self.updates.get()
+            else:
+                data = json.loads(await asyncio.wait_for(reader.readexactly(length), 5))
+                action = path[4:]
+                previous = self.rooms.rooms.get(data.get('code'), {}).get('session_id') if isinstance(data,dict) else None
+                result = self.rooms.request(action, data)
+                if action == 'resume' and result.get('session_id') != previous:
+                    old_pair = self.pairs.pop(data['code'], {})
+                    self.save_routes.pop(data['code'], None)
+                    self.relay_ready.pop(data['code'], None)
+                    for _, partner in list(old_pair.values()): partner.close()
+                if action in ('create','join','close','resume'):
+                    logging.info('room %s', action)
         except ServiceError as exc:
             result = exc.result
         except (ValueError, TypeError, UnicodeError, asyncio.IncompleteReadError, asyncio.LimitOverrunError, TimeoutError, RecursionError, ConnectionError):
@@ -241,6 +258,7 @@ class Server:
             code = room['code']
             transport = room['session_id']
             pair = self.pairs.setdefault(code, {})
+            save_route = self.save_routes.setdefault(code, SaveRoute(self.rooms.save_state_version==3,room.get("save_peers",{})))
             if role in pair:
                 return
             pair[role] = (reader, writer)
@@ -271,6 +289,7 @@ class Server:
                 if message is None: break
                 traffic += len(line)
                 if traffic > self.traffic_limit: break
+                if not save_route.forward(role,message): continue
                 other.write(line)
                 await asyncio.wait_for(other.drain(), 10)
         except (ServiceError, ValueError, TypeError, KeyError, ConnectionError, TimeoutError, RecursionError):
@@ -282,6 +301,7 @@ class Server:
                 for _, partner in list(pair.values()): partner.close()
                 if self.pairs.get(code) is pair:
                     self.pairs.pop(code, None)
+                    self.save_routes.pop(code, None)
                     self.relay_ready.pop(code, None)
                 logging.info('relay disconnected')
 
@@ -313,7 +333,7 @@ async def main(args):
     if args.bind not in ('127.0.0.1', '::1') and context is None:
         raise SystemExit('Public binding requires --cert and --key. Plaintext development is loopback-only.')
     rooms = Rooms(0 if args.no_relay else args.relay_port, bool(context), ttl=args.ttl, protocol=args.protocol, max_rooms=args.max_rooms, max_age=args.max_age, relay_host=args.relay_host)
-    service = Server(rooms, args.traffic_limit, args.idle_timeout)
+    service = Server(rooms, args.traffic_limit, args.idle_timeout, args.update_manifest)
     tls_timeouts = {'ssl_handshake_timeout': 10, 'ssl_shutdown_timeout': 5} if context else {}
     servers = [await asyncio.start_server(service.http, args.bind, args.port, ssl=context, limit=8192, backlog=64, **tls_timeouts)]
     if not args.no_relay:
@@ -324,6 +344,7 @@ async def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--update-manifest', default=os.getenv('CARDLINK_UPDATE_MANIFEST'))
     parser.add_argument('--bind', default=os.getenv('CARDLINK_BIND','127.0.0.1'))
     parser.add_argument('--port', type=int, default=int(os.getenv("CARDLINK_PORT","8787")))
     parser.add_argument('--relay-port', type=int, default=int(os.getenv("CARDLINK_RELAY_PORT","8788")))

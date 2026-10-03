@@ -16,7 +16,7 @@ static func keys(data: Variant, allowed: Array, required: bool = true) -> bool:
 static func position(value: Variant) -> bool:
 	return value is Array and value.size() == 2 and number(value[0], -10, 10) and number(value[1], -10, 10)
 static func card(data: Variant, partial: bool = false) -> bool:
-	if not keys(data, CARD_FIELDS + ["face_index"], false) or (not partial and not CARD_FIELDS.all(func(key: String) -> bool: return data.has(key))) or not text(data.get("id"), 80) or data.id.is_empty():
+	if not keys(data, CARD_FIELDS + ["face_index","deck_back"], false) or (not partial and not CARD_FIELDS.all(func(key: String) -> bool: return data.has(key))) or not text(data.get("id"), 80) or data.id.is_empty():
 		return false
 	for field: String in data:
 		var value: Variant = data[field]
@@ -33,6 +33,8 @@ static func card(data: Variant, partial: bool = false) -> bool:
 				if not value is Dictionary or value.size() > 24: return false
 				for name: Variant in value:
 					if not text(name, 48) or not number(value[name], 0, 1000000): return false
+			"deck_back":
+				if not preload("res://scripts/battle/deck_back.gd").valid(value): return false
 			"face_index":
 				if not number(value,0,15) or value != floor(value): return false
 			"art":

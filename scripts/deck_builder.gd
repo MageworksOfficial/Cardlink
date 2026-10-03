@@ -1,5 +1,8 @@
 extends PanelContainer
 signal archive_requested
+signal import_requested
+var custom_import_button: Button
+var online_search_button: Button
 signal back_requested
 signal play_requested(deck: Dictionary, leaders_out: bool)
 const Storage = preload("res://scripts/deck_storage.gd")
@@ -29,6 +32,8 @@ var delete_dialog: ConfirmationDialog
 var discard_dialog: ConfirmationDialog
 var pending: Callable
 var dirty: bool = false
+var standalone: bool = false
+var back_picker: Window
 var updating: bool = false
 var clean_deck: Dictionary = deck.duplicate(true)
 var clean_path: String = ""
@@ -48,12 +53,21 @@ func _ready() -> void:
 	add_child(rows)
 	var optional := HBoxContainer.new()
 	rows.add_child(optional)
-	button(optional,"Import Decklist",func() -> void: preload("res://scripts/integrations/integration_hub.gd").open(self,1))
+	var title := Label.new(); title.text="DECK BUILDER"; optional.add_child(title)
+	custom_import_button = button(optional,"+ Import Custom Card",func() -> void: import_requested.emit())
+	custom_import_button.tooltip_text = "Import a card image from your computer."
+	online_search_button = button(optional,"Online Card Search",func() -> void: preload("res://scripts/integrations/integration_hub.gd").open(self,0))
+	online_search_button.tooltip_text = "Search an optional online card provider."
+	button(optional,"Import ZIP Deck",func() -> void: archive_requested.emit()).tooltip_text = "Create a deck from a folder/archive of card images."
+	button(optional,"Import Decklist",func() -> void: preload("res://scripts/integrations/integration_hub.gd").open(self,1)).tooltip_text = "Build a deck from a pasted card list."
+	back_picker = preload("res://scripts/battle/deck_back_picker.gd").new()
+	add_child(back_picker)
+	back_picker.chosen.connect(func(value: Dictionary) -> void: deck["deck_back"]=value;dirty=true;status.text="Deck back selected. Save the deck to keep it.")
+	button(optional,"Deck Back…",func() -> void: back_picker.open(deck.get("deck_back",{})))
 	var top := HBoxContainer.new()
 	rows.add_child(top)
-	button(top, "Tabletop", func() -> void: guard(func() -> void: back_requested.emit()))
+	button(top, "Back to Title" if standalone else "Tabletop", func() -> void: guard(func() -> void: back_requested.emit()))
 	button(top, "New deck", func() -> void: guard(new_deck))
-	button(top, "Import ZIP", func() -> void: archive_requested.emit())
 	deck_picker = OptionButton.new()
 	deck_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(deck_picker)
@@ -84,6 +98,9 @@ func _ready() -> void:
 	query = LineEdit.new()
 	query.placeholder_text = "Search Card Library"
 	query.text_changed.connect(func(_text: String) -> void: refresh_catalog())
+	var available_label := Label.new()
+	available_label.text = "AVAILABLE CARDS"
+	left.add_child(available_label)
 	left.add_child(query)
 	catalog = ItemList.new()
 	catalog.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -95,6 +112,9 @@ func _ready() -> void:
 	var right := VBoxContainer.new()
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	columns.add_child(right)
+	var current_label := Label.new()
+	current_label.text = "CURRENT DECK"
+	right.add_child(current_label)
 	count = Label.new()
 	right.add_child(count)
 	entries = ItemList.new()
@@ -128,6 +148,7 @@ func _ready() -> void:
 	face_button = button(face_column,"Next Face",func() -> void: show_face(preview_face+1))
 	var play := HBoxContainer.new()
 	rows.add_child(play)
+	play.visible = not standalone
 	leaders_out = CheckBox.new()
 	leaders_out.text = "Start leaders outside library (one copy of each)"
 	leaders_out.button_pressed = true
@@ -151,6 +172,7 @@ func _ready() -> void:
 		dirty = false
 		pending.call())
 	sync_fields()
+	preload("res://scripts/collection_events.gd").shared.collection_changed.connect(collection_updated)
 	hide()
 func guard(action: Callable) -> void:
 	if dirty:
@@ -250,11 +272,12 @@ func select_entry(index: int) -> void:
 	show_preview(deck.cards[index].card_id)
 	updating = false
 func refresh_saved() -> void:
+	var prior_path: String = str(saved[deck_picker.selected].path) if deck_picker.selected >= 0 and deck_picker.selected < saved.size() else saved_path
 	saved = storage.list_decks()
 	deck_picker.clear()
 	for row: Dictionary in saved:
 		deck_picker.add_item(str(row.data.get("deck_name", row.path.get_file())) + (" [error]" if not str(row.error).is_empty() else ""))
-		if row.path == saved_path:
+		if row.path == prior_path:
 			deck_picker.select(deck_picker.item_count - 1)
 func load_selected() -> void:
 	if deck_picker.selected < 0:
@@ -285,6 +308,7 @@ func save_current() -> bool:
 	clean_deck = deck.duplicate(true)
 	clean_path = saved_path
 	dirty = false
+	deck_picker.select(-1)
 	refresh_saved()
 	status.text = "Saved " + str(deck.deck_name)
 	return true
@@ -332,3 +356,29 @@ func show_face(index: int) -> void:
 	if path.get_base_dir().simplify_path() != loader.storage.directory.simplify_path() or path.contains(".."): return
 	var image := Image.new()
 	if FileAccess.file_exists(path) and image.load(path) == OK: preview.texture = ImageTexture.create_from_image(image)
+
+func collection_updated(directory: String) -> void:
+	if directory != preload("res://scripts/collection_events.gd").key(loader.storage.directory): return
+	var chosen: Array[String] = []
+	for index: int in catalog.get_selected_items(): chosen.append(str(catalog.get_item_metadata(index)))
+	var scroll_value: float = catalog.get_v_scroll_bar().value
+	records = loader.load_records()
+	refresh_catalog()
+	for index: int in catalog.item_count:
+		if str(catalog.get_item_metadata(index)) in chosen: catalog.select(index,false)
+	catalog.get_v_scroll_bar().set_deferred("value",scroll_value)
+	# Refresh labels only, preserving current deck, fields, quantities and selection.
+	for i: int in mini(deck.cards.size(),entries.item_count):
+		var entry: Dictionary = deck.cards[i]
+		var record: Dictionary = record_for(entry.card_id)
+		entries.set_item_text(i,"%d × %s%s" % [entry.quantity,str(record.get("name","Missing/ambiguous: "+str(entry.card_id)))," [Leader]" if deck.leaders.has(entry.card_id) else ""])
+	if not preview_id.is_empty(): show_face(preview_face)
+func add_imported_card(id: String) -> bool:
+	collection_updated(preload("res://scripts/collection_events.gd").key(loader.storage.directory))
+	var record: Dictionary = record_for(id)
+	if record.is_empty() or record.get("thumbnail") == null:
+		status.text = "Imported definition is unavailable in this collection."
+		return false
+	add_card(id)
+	status.text = "Card added to current deck."
+	return true

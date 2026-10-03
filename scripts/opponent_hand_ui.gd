@@ -5,6 +5,7 @@ var cards_row: Control
 var back_count: int = -1
 var public_textures: Array = []
 var public_names: Array = []
+var slot_backs: Array = []
 var back_texture: Texture2D
 var layout_mode_id: String = "row"
 func _ready() -> void:
@@ -23,10 +24,11 @@ func _ready() -> void:
 	cards_row.custom_minimum_size = Vector2(0, 56)
 	cards_row.resized.connect(arrange)
 	column.add_child(cards_row)
-func present(count: int, back: Texture2D, faces: Array = [], names: Array = []) -> void:
+func present(count: int, back: Texture2D, faces: Array = [], names: Array = [], backs: Array = []) -> void:
 	label.text = "Opponent hand: %d" % count
-	if count == back_count and back == back_texture and faces == public_textures and names == public_names:
+	if count == back_count and back == back_texture and faces == public_textures and names == public_names and backs == slot_backs:
 		return
+	slot_backs = backs.duplicate()
 	public_textures = faces.duplicate()
 	public_names = names.duplicate()
 	back_count = count
@@ -37,7 +39,7 @@ func present(count: int, back: Texture2D, faces: Array = [], names: Array = []) 
 	for i: int in count:
 		var item := TextureRect.new()
 		var face: Texture2D = faces[i] if i < faces.size() else null
-		item.texture = face if face != null else back
+		item.texture = face if face != null else (backs[i] if i<backs.size() else back)
 		item.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		item.size = Vector2(40, 56)
 		item.mouse_filter = Control.MOUSE_FILTER_STOP

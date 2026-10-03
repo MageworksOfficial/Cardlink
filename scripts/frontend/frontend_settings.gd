@@ -72,6 +72,11 @@ func _ready() -> void:
 	about_button.text = "About CardLink / Beta Information…"
 	about_button.pressed.connect(func() -> void: preload("res://scripts/frontend/about_cardlink.gd").open(shell))
 	rows.add_child(about_button)
+	var update_button:=Button.new();update_button.text="Check for Updates"
+	update_button.pressed.connect(func() -> void:
+		if shell.updater!=null:
+			title.close_settings();shell.updater.open();shell.update_service.check_now())
+	rows.add_child(update_button)
 	shell.table_preferences.build(rows,Callable())
 	var scroll := ScrollContainer.new()
 	settings.add_child(scroll)
@@ -151,6 +156,7 @@ func save() -> void:
 	if error == OK: error = privacy.save(shell.privacy_path)
 	name_edit.text = shell.preferences.player_name()
 	if shell.table_scene != null:
+		shell.table_scene.tabletop.battle.nickname(shell.preferences.player_name())
 		var c: Node = shell.table_scene.tabletop.match_controller
 		if c.hands_hidden != hide_hands.button_pressed: shell.table_scene.tabletop.shortcuts.toggle_hands()
 		var panel: Node = shell.table_scene.get_node_or_null("Network")

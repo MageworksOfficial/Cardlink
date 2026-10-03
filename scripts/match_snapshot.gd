@@ -74,10 +74,15 @@ static func validate(data: Dictionary) -> String:
 		if not card.zone_id.is_empty() and zones[card.zone_id].player_id != card.zone_player_id:
 			return "Zone holder mismatch."
 		cards[card.match_instance_id] = card
+	var custom: Dictionary = data.get("local_tabletop",{}).get("custom_table",{})
+	for pile_id: String in custom.get("orders",{}):
+		for id: String in custom.orders[pile_id]:
+			if not cards.has(id) or cards[id].custom_metadata.get("table_component","") != pile_id: return "Custom pile refers to a missing or inconsistent card."
 	var players: Dictionary = {}
 	for player: Variant in data.players:
 		if not player is Dictionary or not player.get("player_id") in ["local", "opponent"] or players.has(player.player_id) or not player.get("display_name") is String or not Layout.number(player.get("life")) or player.life != floor(player.life):
 			return "Invalid or duplicate player."
+		if player.has("deck_back") and (not player.deck_back is Dictionary or (not player.deck_back.is_empty() and not preload("res://scripts/battle/deck_back.gd").valid(player.deck_back))): return "Invalid saved deck back."
 		if player.has("deck_manifest"):
 			if not player.deck_manifest is Array or player.deck_manifest.size() > 5000: return "Invalid saved deck manifest."
 			for entry: Variant in player.deck_manifest:
@@ -128,6 +133,7 @@ static func restore(manager: Node, data: Dictionary) -> Dictionary:
 		player.life = int(saved.life)
 		player.deck_name = saved.deck_name
 		player.deck_manifest = saved.get("deck_manifest",[]).duplicate(true)
+		player.deck_back = saved.get("deck_back",{}).duplicate(true)
 		player.library.order.assign(saved.library_order)
 		player.loaded_ids.assign(saved.loaded_ids)
 		player.hand.assign(saved.hand)

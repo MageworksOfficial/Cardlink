@@ -70,7 +70,9 @@ func run() -> void:
 	release.pressed = false
 	Input.parse_input_event(release)
 	Input.flush_buffered_events()
-	check(app.entry.window.visible,"Enter opens focused Offline setup")
+	check(app.table_selection.visible,"Enter opens table choice")
+	app.table_chosen(false)
+	check(app.entry.window.visible,"Standard opens focused Offline setup")
 	app.entry.start(app.Mode.OFFLINE_PLAYTEST)
 	check(await wait_for(func() -> bool: return app.mode==app.Mode.OFFLINE_PLAYTEST and not app.entering),"Enter activates focused Offline mode")
 	if app.table_scene==null: quit(1); return
@@ -112,6 +114,7 @@ func run() -> void:
 	await process_frame
 	check(app.mode==app.Mode.TITLE and app.table_scene==null and title.visible,"Confirmed return clears table and shows title")
 	title.buttons[0].pressed.emit()
+	app.table_chosen(false)
 	check(await wait_for(func() -> bool: return app.mode==app.Mode.ONLINE and not app.entering),"Online artwork enters existing mode")
 	main = app.table_scene
 	var network: Node = main.get_node("Network")

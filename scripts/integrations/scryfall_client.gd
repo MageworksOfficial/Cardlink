@@ -99,6 +99,10 @@ func cancel() -> void:
 func search(query: String, page: int = 1) -> Dictionary:
 	if query.strip_edges().is_empty(): return {"error":"Enter a card name."}
 	return await request(API+"/cards/search?q="+query.uri_encode()+"&unique=cards&order=name&page="+str(clampi(page,1,100)))
+func search_sorted(query: String, page: int = 1, order: String = "name") -> Dictionary:
+	if not order in preload("res://scripts/integrations/scryfall_query.gd").SORTS: return {"error":"Unsupported sort order."}
+	if query.strip_edges().is_empty(): return {"error":"Enter a name or choose filters."}
+	return await request(API+"/cards/search?q="+query.uri_encode()+"&unique=cards&order="+order+"&page="+str(clampi(page,1,100)))
 func resolve_card(entry: Dictionary) -> Dictionary:
 	if not str(entry.get("set_code","")).is_empty() and not str(entry.get("collector_number","")).is_empty():
 		return await request(API+"/cards/"+str(entry.set_code).to_lower().uri_encode()+"/"+str(entry.collector_number).uri_encode())

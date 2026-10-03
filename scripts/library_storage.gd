@@ -31,6 +31,7 @@ func delete_definition(path: String) -> Dictionary:
 	if not definition_path_allowed(path):
 		return {"error": "Definition path is outside this library."}
 	var error: Error = DirAccess.remove_absolute(path)
+	if error == OK: preload("res://scripts/collection_events.gd").publish(directory)
 	return {"error": "Cannot delete definition: " + error_string(error)} if error != OK else {"deleted": true}
 func cleanup_candidates() -> Dictionary:
 	# Unknown references block cleanup; rescan again at confirmation time.

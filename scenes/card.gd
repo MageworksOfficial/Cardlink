@@ -115,7 +115,7 @@ func update_counters() -> void:
 	for value: int in state.counters.values():
 		total += value
 	counter_label.text = ("★ %d
-" % total + "\n".join(lines)) if total > 0 else ""
+" % total + "\n".join(lines)) if not state.counters.is_empty() else ""
 func _on_mouse_entered() -> void:
 	if not dragging and not state.face_down and state.identity_visible:
 		var viewport_size: Vector2 = get_viewport_rect().size

@@ -7,6 +7,9 @@ func _init(table: Node) -> void:
 	manager = table
 func set_edit_mode(value: bool) -> void:
 	edit_mode = value
+	if manager.custom_table != null:
+		manager.custom_table.refresh_presentation()
+		if manager.custom_table.editor != null: manager.custom_table.editor.mode_changed(value)
 	if manager.controls.edit_button != null:
 		manager.controls.edit_button.set_pressed_no_signal(value)
 	for zone: Control in manager.zones:

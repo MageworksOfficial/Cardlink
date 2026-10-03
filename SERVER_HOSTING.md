@@ -1,3 +1,9 @@
+## V0.8.5.1: independent Update Service
+
+The planned **GET /v1/update** endpoint is separate in responsibility and configuration from room signaling/gameplay relay. It serves tiny validated metadata through `update_manifest.py`; GitHub Releases hosts package bytes. The temporary route shares the existing HTTPS listener, but does not consult room/relay state. It can later move behind a stable dedicated hostname/front end without changing gameplay configuration. A whole shared-host/process outage can still affect both until physically separated.
+
+See [UPDATING.md](UPDATING.md) for schema/cache/client behavior and [SERVER_V0851_UPDATE.md](SERVER_V0851_UPDATE.md) for the prepared deployment checklist. No live deployment was performed. The live HTTPS check reported an expired certificate; verification was not disabled. Optional future server_directory_url is only a placeholder, not an implemented directory.
+
 # CardLink service hosting
 The Python service handles room-code signaling and a separate bounded, schema-validated TCP/TLS relay. It is not a game rules authority. Current relay schemas include approved public actions and consent-controlled transfer paths; private hands/library order must not become unrestricted snapshots. Review service/relay_protocol.py and service tests before changes.
 

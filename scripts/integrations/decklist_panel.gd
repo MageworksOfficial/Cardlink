@@ -66,5 +66,8 @@ func commit() -> void:
 	if not issues.is_empty() and not ignore_bad.button_pressed: host.status.text="Correct the unparsed lines or explicitly choose Skip unparsed lines."; return
 	host.busy=true; input.editable=false
 	var response: Dictionary = await host.hub.importer.commit(plan,deck_name.text)
-	host.status.text=response.error if response.has("error") else "Deck saved: "+str(response.deck.deck_name)+". Open Deck Builder and Refresh."
+	host.status.text=response.error if response.has("error") else "Deck saved: "+str(response.deck.deck_name)+". Available cards refreshed automatically."
+	if not response.has("error"):
+		var deck: Node = preload("res://scripts/collection_workflow.gd").valid_deck(host.hub.context_owner)
+		if deck != null: deck.refresh_saved()
 	input.editable=true; host.busy=false

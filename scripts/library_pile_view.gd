@@ -34,7 +34,7 @@ func refresh() -> void:
 	var order: Array = controller.model.players[player_id].library.order
 	var count: int = controller.hidden_count(player_id, "library")
 	stack_depth = mini(12, ceili(count / 8.0))
-	back_image.texture = controller.manager.backs.texture()
+	back_image.texture = controller.manager.deck_backs.library_texture(player_id)
 	if count > 0:
 		var rows: Array = controller.library_rows(player_id)
 		if not rows.is_empty() and rows[0].known: back_image.texture = rows[0].texture

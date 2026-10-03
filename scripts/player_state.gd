@@ -11,6 +11,7 @@ var leaders: Array[String] = []
 var battlefield: Array[String] = []
 var loaded_ids: Array[String] = []
 var deck_manifest: Array = []
+var deck_back: Dictionary = {}
 var deck_name: String = "No deck loaded"
 func _init(id: String = "local", caption: String = "Local player") -> void:
 	player_id = id
@@ -20,4 +21,4 @@ func to_data() -> Dictionary:
 		"library_order": library.order.duplicate(), "hand": hand.duplicate(),
 		"graveyard": graveyard.duplicate(), "exile": exile.duplicate(),
 		"leaders": leaders.duplicate(), "battlefield": battlefield.duplicate(),
-		"loaded_ids": loaded_ids.duplicate(), "deck_name": deck_name, "deck_manifest": deck_manifest.duplicate(true)}
+		"deck_back":deck_back.duplicate(true),"loaded_ids": loaded_ids.duplicate(), "deck_name": deck_name, "deck_manifest": deck_manifest.duplicate(true)}

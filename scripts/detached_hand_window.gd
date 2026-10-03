@@ -107,7 +107,7 @@ func begin_drag(id: String) -> void:
 	if not detached or card == null or card.state.current_zone != "hand" or card.state.zone_player_id != controller.active_hand_player(): return
 	drag_id = id
 	drag_origin = Vector2(DisplayServer.mouse_get_position())
-	controller.manager.select_card(card)
+	if not controller.manager.selection.ids.has(id): controller.manager.select_card(card)
 	controller.hide_preview()
 	drag_steps.clear()
 	set_drag_phase("drag_started")
@@ -120,12 +120,7 @@ func begin_drag(id: String) -> void:
 func drop_on_field(id: String, viewport_point: Vector2) -> bool:
 	var card: Control = controller.card_by_id(id)
 	if card == null or card.state.current_zone != "hand" or card.state.zone_player_id != controller.active_hand_player() or not controller.manager.view.over_field(viewport_point): return false
-	var tapped: bool = card.state.tapped
-	if not controller.move_card(card,"battlefield",true,card.state.zone_player_id): return false
-	card.position = controller.manager.world.get_global_transform().affine_inverse() * viewport_point-card.size/2
-	card.state.position = card.position
-	card.set_tapped(tapped)
-	return true
+	return controller.library_actions.place_cards(controller.library_actions.hand_drag_ids(id),controller.manager.world.get_global_transform().affine_inverse()*viewport_point-card.size/2,controller.library_actions.enter_face_down)>0
 func drop_to_hand(id: String) -> bool:
 	var card: Control = controller.card_by_id(id)
 	if card == null or card.state.current_zone != "battlefield" or (controller.online() and card.state.owner_player_id != "local"): return false

@@ -12,13 +12,22 @@ func execute(action: String, event: InputEventKey = null) -> void:
 	if action == "undo": manager.undo.undo(); return
 	manager.undo.begin(str(manager.shortcuts.bindings.ACTIONS.get(action,[action])[0]))
 	match action:
+		"reset_match": manager.battle.reset.open()
+		"background_edit": manager.appearance.toggle_edit()
+		"play_top": c.library_actions.play_active()
 		"card_face":
 			for id: String in selected_cards(): preload("res://scripts/usability/face_actions.gd").change(manager,c.card_by_id(id))
 		"tap":
 			for id: String in selected_cards(): manager.toggle_tap(c.card_by_id(id))
-		"draw": c.draw_card(local)
+		"draw":
+			if manager.custom_table != null and manager.custom_table.enabled: manager.custom_table.draw_active()
+			else: c.draw_card(local)
 		"discard": manager.shortcuts.discard()
-		"shuffle": c.shuffle_library(local)
+		"shuffle":
+			if manager.custom_table != null and manager.custom_table.enabled: manager.custom_table.shuffle_active()
+			else: c.shuffle_library(local)
+		"table_builder":
+			if manager.custom_table != null and manager.custom_table.enabled: manager.custom_table.editor.toggle_drawer()
 		"hands": manager.shortcuts.toggle_hands()
 		"layout": manager.shortcuts.toggle_layout()
 		"mode": manager.shortcuts.toggle_playtest()

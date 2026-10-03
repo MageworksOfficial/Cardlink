@@ -7,6 +7,7 @@ var snap_button: Button
 var layout_button: Button
 var hands_button: Button
 var playtest_button: Button
+var start_match_button: Button
 var quick_row: HBoxContainer
 var hands_menu: PopupMenu
 var help: Window
@@ -22,17 +23,19 @@ func _ready() -> void:
 	quick_row.z_index = 205
 	manager.get_parent().add_child(quick_row)
 	quick_row.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	quick_row.offset_left = -625
+	quick_row.offset_left = -780
 	quick_row.offset_right = -8
 	quick_row.offset_top = 12
 	quick_row.offset_bottom = 48
 	playtest_button = quick_button("Online [P]",toggle_playtest,"Switch between online opponent and local playtest opponent. Shortcut: P")
-	hands_button = quick_button("Hands: Shown [X]",toggle_hands,"Show or hide both hands. Use the arrow for detached hand controls. Shortcut: X")
-	quick_button("▾",open_hands,"Show, hide, or detach hand controls. Shortcut: X")
+	start_match_button=preload("res://scripts/battle/start_match_control.gd").new()
+	start_match_button.manager=manager
+	quick_row.add_child(start_match_button)
+	hands_button = quick_button("Hands: Shown [X]",toggle_hands,"Show or hide both hands. Right-click for detached hand controls. Shortcut: X")
 	hands_button.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT: open_hands())
 	layout_button = quick_button("Layout: Off [L]",toggle_layout,"Move major tabletop zones. Shortcut: L")
-	snap_button = quick_button("Snap…",func() -> void: manager.controls.open_panel("Layout"),"Layout snapping and reset options")
+	snap_button = quick_button("Snap...",func() -> void: manager.controls.open_panel("Layout"),"Layout snapping and reset options")
 	quick_button("Controls",open_help,"Quick mouse and keyboard controls.")
 	quick_button("Menu",func() -> void: manager.extras.open_corner(),"Decks, tools, settings, and match options.")
 	hands_menu = PopupMenu.new()
@@ -72,11 +75,13 @@ func _process(_delta: float) -> void:
 	snap_button.visible = manager.layout.edit_mode
 	playtest_button.text = ("Playtest" if manager.match_controller.playtest.local_playtest() else "Online") + " ["+bindings.caption("mode")+"]"
 	layout_button.text = "Layout: %s [%s]" % ["On" if manager.layout.edit_mode else "Off",bindings.caption("layout")]
+	if manager.custom_table != null and manager.custom_table.enabled:
+		layout_button.text = ("BUILD MODE" if manager.layout.edit_mode else "PLAY MODE")+" ["+bindings.caption("layout")+"]"
 	layout_button.modulate = Color(1,0.85,0.35) if manager.layout.edit_mode else Color.WHITE
 	hands_button.text = ("Hands: Hidden" if manager.match_controller.hands_hidden else "Hands: Shown")+" ["+bindings.caption("hands")+"]"
-	playtest_button.tooltip_text = "Switch table mode · "+bindings.caption("mode")
-	hands_button.tooltip_text = "Show/hide hands · "+bindings.caption("hands")
-	layout_button.tooltip_text = "Move zones and UI anchors · "+bindings.caption("layout")
+	playtest_button.tooltip_text = "Switch table mode - "+bindings.caption("mode")
+	hands_button.tooltip_text = "Show/hide hands; right-click for detached hand controls - "+bindings.caption("hands")
+	layout_button.tooltip_text = "Move zones and UI anchors - "+bindings.caption("layout")
 	if not manager.active: help.hide()
 func quick_button(caption: String, action: Callable, hint: String) -> Button:
 	var item: Button = manager.controls.button(quick_row,caption,action)
@@ -89,6 +94,11 @@ func toggle_playtest() -> void:
 		mode_notice.popup_centered()
 		return
 	var next: String = "online" if mode.local_playtest() else "local_playtest"
+	if next=="online":
+		var shell: Node=manager.get_parent().app_shell
+		if shell!=null and shell.updater!=null:
+			if not await shell.updater.allow_online(): return
+			if not mode.local_playtest() or mode.network_busy(): return
 	if mode.set_mode(next):
 		manager.controls.status.text = "Playtest Mode Enabled" if next == "local_playtest" else "Online Mode Selected"
 	elif next == "online":
@@ -105,6 +115,7 @@ func toggle_hands() -> void:
 	c.opponent_hand.visible = manager.active and not c.hands_hidden
 	c.hide_preview()
 	if c.hand_window != null: c.hand_window.refresh()
+	if manager.custom_table != null and manager.custom_table.enabled: manager.custom_table.refresh_presentation()
 	hands_button.text = "Hands: Hidden [X]" if c.hands_hidden else "Hands: Shown [X]"
 	manager.controls.status.text = "Hands Hidden" if c.hands_hidden else "Hands Shown"
 func open_hands() -> void:

@@ -63,8 +63,8 @@ func new_match() -> void:
 	clear("New Match")
 	label("Your cards. Your table. Choose how to play.")
 	build_starting_life()
-	button("Online · Play with a friend",func() -> void: start(shell.Mode.ONLINE))
-	button("Offline Playtest · Control both players",offline)
+	button("Online · Play with a friend",func() -> void: shell.choose_table(shell.Mode.ONLINE))
+	button("Offline Playtest · Control both players",func() -> void: shell.choose_table(shell.Mode.OFFLINE_PLAYTEST))
 	button("Back",window.hide)
 func offline() -> void:
 	deck_preferences = preload("res://scripts/usability/deck_preferences.gd").new(deck_preferences.path)

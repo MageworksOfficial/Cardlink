@@ -3,13 +3,22 @@ extends RefCounted
 const Layout = preload("res://scripts/layout_service.gd")
 static func capture(manager: Node) -> Dictionary:
 	var model: RefCounted = manager.match_controller.model
-	return {"viewed_player": manager.perspective.viewed_player if manager.perspective != null and manager.perspective.offline() else "local", "turn_number": model.turn_number, "active_player": model.active_player, "history": model.history.duplicate(true), "counters": manager.extras.capture_counters(), "opponent_mode":manager.match_controller.playtest.mode, "hand_player":manager.match_controller.active_hand_player(), "hand_detached":manager.match_controller.hand_window.detached, "hand_position":[manager.match_controller.hand_window.window.position.x,manager.match_controller.hand_window.window.position.y], "remote_library_knowledge":manager.match_controller.remote_library_knowledge.duplicate(true), "remote_library_count":manager.match_controller.remote_library_count}
+	return {"background":manager.appearance.background.duplicate(true) if manager.appearance!=null else preload("res://scripts/appearance/background_config.gd").defaults(),"reset_start":manager.battle.reset.start.capture() if manager.battle!=null else {},"deck_backs":manager.deck_backs.piles.duplicate(true),"custom_table":manager.custom_table.capture() if manager.custom_table != null else {"enabled":false,"table":preload("res://scripts/custom_table/table_document.gd").fresh(),"orders":{}},"viewed_player": manager.perspective.viewed_player if manager.perspective != null and manager.perspective.offline() else "local", "turn_number": model.turn_number, "active_player": model.active_player, "history": model.history.duplicate(true), "counters": manager.extras.capture_counters(), "opponent_mode":manager.match_controller.playtest.mode, "hand_player":manager.match_controller.active_hand_player(), "hand_detached":manager.match_controller.hand_window.detached, "hand_position":[manager.match_controller.hand_window.window.position.x,manager.match_controller.hand_window.window.position.y], "remote_library_knowledge":manager.match_controller.remote_library_knowledge.duplicate(true), "remote_library_count":manager.match_controller.remote_library_count}
 static func validate(data: Variant) -> String:
 	if not data is Dictionary:
 		return "Invalid local tabletop state."
 	if not data.get("opponent_mode","online") in ["online","local_playtest"] or not data.get("hand_player","local") in ["local","opponent"] or not data.get("hand_detached",false) is bool or not Layout.vector_valid(data.get("hand_position",[100,100])):
 		return "Invalid hand window or playtest state."
 	if not data.get("viewed_player","local") in ["local","opponent"]: return "Invalid viewed player."
+	if data.has("background") and not preload("res://scripts/appearance/background_config.gd").valid(data.background): return "Invalid battlefield background."
+	if data.has("reset_start") and not preload("res://scripts/battle/starting_match.gd").valid(data.reset_start): return "Invalid rematch starting configuration."
+	if data.has("deck_backs"):
+		if not data.deck_backs is Dictionary or data.deck_backs.size()>128: return "Invalid saved pile backs."
+		for config: Variant in data.deck_backs.values():
+			if not preload("res://scripts/battle/deck_back.gd").valid(config): return "Invalid saved pile back."
+	if data.has("custom_table"):
+		var table_error: String = preload("res://scripts/custom_table/table_builder.gd").validate_saved(data.custom_table)
+		if not table_error.is_empty(): return table_error
 	var memories: Variant = data.get("remote_library_knowledge",{})
 	if not memories is Dictionary or memories.size()>500: return "Invalid library knowledge."
 	for slot: Variant in memories:
@@ -35,12 +44,14 @@ static func validate(data: Variant) -> String:
 		seen[row.instance_id] = true
 	return ""
 static func restore(manager: Node, data: Dictionary) -> void:
+	if manager.battle!=null: manager.battle.reset.start.restore(data.get("reset_start",{}))
 	var model: RefCounted = manager.match_controller.model
 	model.turn_number = int(data.get("turn_number", 1))
 	model.active_player = data.get("active_player", "local")
 	model.history.assign(data.get("history", []))
 	manager.extras.restore_counters(data.get("counters", []))
 	manager.extras.refresh_history()
+	manager.deck_backs.piles=data.get("deck_backs",{}).duplicate(true)
 	var c: Node = manager.match_controller
 	c.playtest.mode = data.get("opponent_mode","online")
 	c.playtest.hand_player = data.get("hand_player","local") if c.playtest.local_playtest() else "local"
@@ -52,3 +63,6 @@ static func restore(manager: Node, data: Dictionary) -> void:
 	var point: Array = data.get("hand_position",[100,100])
 	c.hand_window.last_position = Vector2i(point[0],point[1])
 	if data.get("hand_detached",false): c.hand_window.open_hand()
+	if manager.custom_table != null:
+		manager.custom_table.restore(data.get("custom_table",{}))
+	if manager.appearance!=null: manager.appearance.apply(data.get("background",preload("res://scripts/appearance/background_config.gd").defaults()),false)

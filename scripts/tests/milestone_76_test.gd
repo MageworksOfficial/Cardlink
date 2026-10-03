@@ -8,7 +8,7 @@ func run() -> void:
 	var title: Control = app.title_screen
 	var motion: Node = title.animation
 	check(title.visible and app.table_scene == null,"Title opens without starting a match")
-	check(app.title_screen.composition.get_node("BuildVersion").text == preload("res://scripts/frontend/app_info.gd").LABEL,"Title uses current central version")
+	check(app.updater.button.text.begins_with(preload("res://scripts/frontend/app_info.gd").LABEL),"Title uses current central version")
 	motion.set_focused(true)
 	motion._process(0.1)
 	check(motion.ring.rotation > 0,"Independent tech arcs rotate")
@@ -37,6 +37,8 @@ func run() -> void:
 	app.table_preferences.put("reduce_motion",false)
 	await screenshot(base,"title")
 	title.offline_requested.emit()
+	check(app.table_selection.visible,"Offline opens Choose Your Table")
+	app.table_chosen(false)
 	check(app.entry.window.visible and app.table_scene == null,"Offline panel opens setup rather than starting immediately")
 	check(app.entry.player_names.size() == 2 and app.entry.player_lives.size() == 2 and app.entry.deck_pickers.size() == 2,"Setup provides two names/decks/life values")
 	await screenshot(base,"setup")

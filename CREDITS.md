@@ -2,7 +2,14 @@
 ## Beta testers
 Special thanks to the early CardLink testers who helped find bugs, test multiplayer, and improve the project. Your feedback helped shape CardLink into what it is today.
 
-Tester names will be listed only with explicit permission. Recognition does not promise payment, permanent perks or privileges.
+### First Beta Testers
+
+- Mattamn
+- Picklenick99
+
+Special thanks for helping test real matches, identify usability problems, and shape CardLink development.
+
+Additional tester names will be listed only with explicit permission. Recognition does not promise payment, permanent perks or privileges.
 
 ## Tools and services
 Built with [Godot Engine](https://godotengine.org/), distributed under the [MIT license and engine component notices](https://godotengine.org/license/). Copyright © 2014–present Godot Engine contributors; © 2007–2014 Juan Linietsky, Ariel Manzur.

@@ -3,6 +3,7 @@ var client: Node
 var catalog: Node
 var importer: Node
 var window: Window
+var context_owner: WeakRef
 var settings_path: String = "user://integrations/scryfall/settings.cfg"
 static func open(owner: Node, tab: int = 0) -> void:
 	var root: Window = owner.get_tree().root
@@ -11,6 +12,7 @@ static func open(owner: Node, tab: int = 0) -> void:
 		hub=load("res://scripts/integrations/integration_hub.gd").new()
 		hub.name="OptionalCardCatalog"
 		root.add_child(hub)
+	hub.context_owner = weakref(owner)
 	hub.open_window(tab)
 func _ready() -> void:
 	client=preload("res://scripts/integrations/scryfall_client.gd").new()
@@ -37,4 +39,4 @@ func open_window(tab: int = 0) -> void:
 		window.hub=self
 		add_child(window)
 	window.tabs.current_tab=tab
-	window.popup_centered_clamped(Vector2i(1040,740),0.96)
+	window.popup_centered_clamped(Vector2i(1040,680),0.90)

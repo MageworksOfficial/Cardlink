@@ -9,6 +9,8 @@ var adding_face: bool = false
 var add_face_button: Button
 var source: Image
 var busy: bool = false
+var context_owner: WeakRef
+var followup: Button
 @onready var crop: CropPreview = %CropPreview
 @onready var picker: FileDialog = $FileDialog
 @onready var name_edit: LineEdit = %CardName
@@ -23,6 +25,11 @@ func _ready() -> void:
 	%Confirm.get_parent().add_child(add_face_button)
 	add_face_button.pressed.connect(func() -> void:
 		if not busy: adding_face = true; choose_file())
+	followup = Button.new()
+	followup.hide()
+	%Confirm.get_parent().add_child(followup)
+	followup.pressed.connect(use_imported_card)
+	%Close.text = "Done"
 	close_requested.connect(close_importer)
 	%Close.pressed.connect(close_importer)
 	%Choose.pressed.connect(func() -> void: adding_face = false; choose_file())
@@ -36,7 +43,9 @@ func _ready() -> void:
 	confirm_button.pressed.connect(confirm_crop)
 	crop.crop_changed.connect(update_warning)
 
-func open_importer() -> void:
+func open_importer(context: Node = null) -> void:
+	context_owner = weakref(context) if context != null else null
+	followup.hide()
 	popup_centered_clamped(Vector2i(900, 600), 0.9)
 
 func close_importer() -> void:
@@ -57,6 +66,7 @@ func select_file(path: String) -> void:
 	if loaded.has("error"):
 		status.text = str(loaded["error"])
 		return
+	followup.hide()
 	source = loaded["image"] as Image
 	name_edit.text = path.get_file().get_basename()
 	crop.set_image(source)
@@ -98,6 +108,9 @@ func confirm_crop() -> void:
 				result = preload("res://scripts/card_faces.gd").save(storage.directory,str(last_definition.name),faces,last_definition)
 		else:
 			result = storage.save_card(output.save_png_to_buffer(), name_edit.text, source.get_size())
+	# The shared collection event is deferred so archive workers can use it too.
+	# Keep completion behind that refresh, including for callers awaiting busy.
+	await get_tree().process_frame
 	busy = false
 	add_face_button.disabled = last_definition.is_empty()
 	confirm_button.disabled = false
@@ -110,11 +123,18 @@ func confirm_crop() -> void:
 	add_face_button.disabled = false
 	var metadata: Dictionary = result["metadata"]
 	var reused: bool = result["reused"]
-	status.text = "Saved “%s” at 750 × 1050.\n%s\nDefinition: %s" % [
-		metadata["name"],
-		"Exact image already stored; reused existing asset." if reused else "New image saved under user://cards/.",
-		metadata["card_id"]
-	]
+	status.text = "Card added to your library: "+str(metadata.name)
+	if reused: status.text += " · Existing image reused."
+	followup.text = "Add to Current Deck" if preload("res://scripts/collection_workflow.gd").valid_deck(context_owner) != null else "View Card"
+	followup.visible = context_owner != null
 	card_imported.emit(metadata, reused)
 
 
+
+func use_imported_card() -> void:
+	var deck: Node = preload("res://scripts/collection_workflow.gd").valid_deck(context_owner)
+	if deck != null:
+		if deck.add_imported_card(str(last_definition.card_id)): status.text = "Card added to current deck."
+	else:
+		preload("res://scripts/collection_workflow.gd").view_card(context_owner,str(last_definition.card_id))
+		close_importer()

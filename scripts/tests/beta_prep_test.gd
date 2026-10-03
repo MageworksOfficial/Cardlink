@@ -4,7 +4,7 @@ func run() -> void:
     var app: Control = new_app(base)
     await process_frame
     var info = preload("res://scripts/frontend/app_info.gd")
-    check(info.LABEL == "CardLink " + info.VERSION + " Beta","Central Beta identity")
+    check(info.LABEL == "CardLink 7 V0.8.5.1 Beta","Central Beta identity")
     check(info.NETWORK_COMPATIBILITY == "7.7","Wire compatibility unchanged")
     check(info.PROJECT_URL.is_empty(),"No invented project URL")
     var panel: Window = preload("res://scripts/frontend/about_cardlink.gd").open(app)

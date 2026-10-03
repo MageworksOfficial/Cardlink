@@ -11,6 +11,7 @@ static func validate(value: Variant) -> String:
 	for field: String in ["deck_id", "deck_name", "format_id"]:
 		if not value.get(field) is String or str(value[field]).strip_edges().is_empty():
 			return "Missing or invalid " + field
+	if value.has("deck_back") and not preload("res://scripts/battle/deck_back.gd").valid(value.deck_back): return "Invalid deck back."
 	var id: String = value.deck_id
 	if not id.is_valid_filename() or id.contains("..") or id.contains("/") or id.contains("\\"):
 		return "Invalid deck ID."

@@ -113,7 +113,7 @@ func _ready() -> void:
 	for caption: String in ["Hand", "Library", "Zones", "Card", "Token", "Counter", "Life", "Match", "Layout"]:
 		button(bar, caption, open_panel.bind(caption))
 	status = Label.new()
-	status.text = "Play Mode · Cards are freely movable. Open Layout to edit the table."
+	status.text = "Play Mode Â· Cards are freely movable. Open Layout to edit the table."
 	status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	rows.add_child(status)
 	bar.hide()
@@ -130,7 +130,7 @@ func _ready() -> void:
 	build_hand_panel()
 	build_token_panel()
 	build_library_panel()
-	panel("Match")
+	button(panel("Match"),"Reset Matchâ€¦",func() -> void: close_panels();manager.battle.reset.open())
 	panel("Layout")
 	build_persistence.call_deferred()
 	refresh_zones()
@@ -199,10 +199,11 @@ func build_life_panel() -> void:
 	label(rows, "Local player total (both totals also appear on the table):")
 	life_label = label(rows, "Life: 40")
 	label(rows, "Either player's life may be changed. No legality checks.")
-	button(rows, "− Life", func() -> void: manager.match_controller.change_life(str(target.get_selected_metadata()), -1))
+	button(rows, "âˆ’ Life", func() -> void: manager.match_controller.change_life(str(target.get_selected_metadata()), -1))
 	button(rows, "+ Life", func() -> void: manager.match_controller.change_life(str(target.get_selected_metadata()), 1))
 func build_hand_panel() -> void:
 	var rows: VBoxContainer = panel("Hand")
+	(func() -> void: manager.match_controller.library_actions.placement_toggle(rows)).call_deferred()
 	hand_toggle = CheckButton.new()
 	hand_toggle.text = "Show local private hand"
 	hand_toggle.button_pressed = true
@@ -234,7 +235,7 @@ func build_library_panel() -> void:
 	leaders_out.button_pressed = true
 	rows.add_child(leaders_out)
 	button(rows, "Load Deck", request_deck)
-	button(rows, "Import ZIP Deck…", func() -> void: manager.get_parent().open_archive_importer())
+	button(rows, "Import ZIP Deckâ€¦", func() -> void: manager.get_parent().open_archive_importer())
 	button(rows, "Search own library", func() -> void: inspect("local", "library"))
 	button(rows, "Search Opponent Library", func() -> void: inspect("opponent", "library"))
 	button(rows, "Card Library / Import images", func() -> void:
@@ -274,13 +275,17 @@ func play_pending_deck() -> void:
 	status.text = str(result.get("error", "Deck loaded. Shuffle and draw from Library."))
 func build_persistence() -> void:
 	var match_rows: VBoxContainer = panels.Match.get_child(0).get_child(0).get_child(0)
-	label(match_rows, "Local trusted-host saves include both players' hidden information.")
+	label(match_rows, "Local saves are offline snapshots. For connected matches use Online Save / Load below.")
+	button(match_rows,"Online Save / Load Match State…",func() -> void: close_panels();manager.battle.saves.open())
 	match_records = RecordPanel.new()
 	match_records.storage = manager.persistence.matches
 	match_records.capture_data = manager.persistence.capture_match
 	match_records.apply_data = manager.persistence.restore_match
 	match_records.validator = Snapshot.validate
 	match_records.confirm_load = true
+	match_records.save_override = func() -> bool:
+		if not manager.battle.connected(): return false
+		manager.battle.saves.open();return true
 	match_rows.add_child(match_records)
 	var layout_rows: VBoxContainer = panels.Layout.get_child(0).get_child(0).get_child(0)
 	edit_button = CheckButton.new()
@@ -296,6 +301,10 @@ func build_persistence() -> void:
 	button(layout_rows, "Zoom in", func() -> void: manager.view.zoom_by(1.2))
 	button(layout_rows, "Zoom out", func() -> void: manager.view.zoom_by(1.0 / 1.2))
 	button(layout_rows, "Reset pan / zoom", manager.view.reset_view)
+	button(layout_rows,"Battlefield Backgroundâ€¦",func() -> void: manager.appearance.open())
+	var bg_toggle:=CheckButton.new();bg_toggle.text="Background Edit: OFF [Ctrl+B]";layout_rows.add_child(bg_toggle)
+	bg_toggle.toggled.connect(func(_value: bool) -> void: manager.appearance.toggle_edit())
+	(func() -> void: manager.appearance.set_meta("edit_toggle",bg_toggle)).call_deferred()
 	context_actions.build_backs(layout_rows)
 	manager.organization.build_controls(layout_rows)
 	label(layout_rows, "UI text scale")
@@ -340,12 +349,12 @@ func update_selection() -> void:
 		item.disabled = card == null
 		if item.text == "Token Properties": item.visible = card != null and card.state.is_token and manager.match_controller != null and manager.match_controller.visibility.can_present(card.state,"local")
 	if card == null:
-		selected_label.text = "No card selected · Place cards from Card Library"
+		selected_label.text = "No card selected Â· Place cards from Card Library"
 		selected_label.tooltip_text = ""
 		return
 	var allowed: bool = manager.match_controller == null or manager.match_controller.visibility.can_present(card.state, "local")
 	var zone: Control = manager.find_zone(card.state.zone_id)
-	selected_label.text = "%s · %s" % [card.state.display_name if allowed else "Hidden card", card.state.current_zone.capitalize() if zone == null else zone.display_name]
-	selected_label.tooltip_text = "Definition: %s\nInstance: %s\nOwner: %s · Controller: %s" % [card.state.card_definition_id if allowed else "Hidden", card.state.match_instance_id, card.state.owner_player_id, card.state.controller_player_id]
+	selected_label.text = "%s Â· %s" % [card.state.display_name if allowed else "Hidden card", card.state.current_zone.capitalize() if zone == null else zone.display_name]
+	selected_label.tooltip_text = "Definition: %s\nInstance: %s\nOwner: %s Â· Controller: %s" % [card.state.card_definition_id if allowed else "Hidden", card.state.match_instance_id, card.state.owner_player_id, card.state.controller_player_id]
 
 

@@ -10,6 +10,9 @@ var bottom_list: ItemList
 var preview: TextureRect
 var status: Label
 var editing: bool = true
+var surveil: bool = false
+var destination_button: Button
+var destination_caption: Label
 var edit_controls: Array[Control] = []
 var confirm_button: Button
 func button(parent: Node, caption: String, callback: Callable, edit_only: bool = false) -> Button:
@@ -47,8 +50,9 @@ func _ready() -> void:
 	lists.add_child(actions)
 	button(actions, "Up", reorder.bind(-1), true)
 	button(actions, "Down", reorder.bind(1), true)
-	button(actions, "Move to bottom", to_bottom, true)
+	destination_button=button(actions, "Move to bottom", to_bottom, true)
 	caption = Label.new()
+	destination_caption=caption
 	caption.text = "Bottom — last row becomes bottommost"
 	lists.add_child(caption)
 	edit_controls.append(caption)
@@ -74,7 +78,7 @@ func _ready() -> void:
 	rows.add_child(footer)
 	confirm_button = button(footer, "Confirm order", confirm_review)
 	button(footer, "Cancel / Close", cancel)
-func open_review(player: String, count: int, editable: bool = true) -> void:
+func open_review(player: String, count: int, editable: bool = true, to_graveyard: bool = false) -> void:
 	if controller.manager.undo != null: controller.manager.undo.invalidate("Scry / reveal cannot be undone.")
 	if controller.online() and player != "local":
 		controller.manager.controls.status.text = "Opponent hidden-zone access is reserved for Milestone 6C."
@@ -84,6 +88,9 @@ func open_review(player: String, count: int, editable: bool = true) -> void:
 	clear_private()
 	player_id = player
 	editing = editable
+	surveil=to_graveyard
+	destination_button.text="Move to graveyard" if surveil else "Move to bottom"
+	destination_caption.text="To graveyard" if surveil else "Bottom — last row becomes bottommost"
 	original.assign(controller.model.players[player_id].library.order)
 	top.assign(controller.model.players[player_id].library.peek(count))
 	for id: String in top:
@@ -92,7 +99,7 @@ func open_review(player: String, count: int, editable: bool = true) -> void:
 			controller.Knowledge.learn(card.state,"local")
 			if not editable: controller.visibility.set_public_reveal(card.state,true)
 	controller.refresh()
-	title = ("Scry" if editable else "Reveal top") + " %d · %s · temporary inspection" % [top.size(), player]
+	title = (("Surveil" if surveil else "Scry") if editable else "Reveal top") + " %d · %s · temporary inspection" % [top.size(), player]
 	for item: Control in edit_controls:
 		item.visible = editable
 	confirm_button.visible = editable
@@ -143,11 +150,18 @@ func confirm_review() -> void:
 	if not editing:
 		cancel()
 		return
+	if surveil and not bottom.is_empty():
+		var zone: Control=controller.zone_for("graveyard",player_id)
+		if zone.capacity>0 and zone.members.size()+bottom.size()>zone.capacity:
+			status.text="Graveyard zone is full. No changes applied.";return
 	if not controller.model.players[player_id].library.commit_top(original, top, bottom):
 		status.text = "Library changed during review. Close and reopen Scry; no changes were applied."
 		return
+	if surveil:
+		for id: String in bottom.duplicate(): controller.move_card(controller.card_by_id(id),"graveyard",true,player_id)
 	controller.refresh()
-	controller.manager.controls.status.text = "Scry order confirmed for " + player_id
+	if surveil: controller.record_event("surveil",controller.model.players[player_id].display_name+" surveilled",{})
+	controller.manager.controls.status.text = ("Surveil" if surveil else "Scry")+" order confirmed for " + player_id
 	cancel()
 func cancel() -> void:
 	hide()

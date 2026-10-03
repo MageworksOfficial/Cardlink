@@ -57,6 +57,7 @@ func build_card(rows: Node, target: OptionButton) -> void:
 	rows.add_child(counters)
 	card_button(counters, "Add Counter", controls.manager.change_counter.bind(1))
 	card_button(counters, "Remove Counter", controls.manager.change_counter.bind(-1))
+	card_button(rows, "Counters → Loyalty…", func() -> void: preload("res://scripts/battle/loyalty.gd").open(controls.manager))
 	card_button(rows, "Counter type / Set value…", controls.open_panel.bind("Counter"))
 func move_selected(kind: String, target: OptionButton) -> void:
 	controls.manager.match_controller.move_card(controls.manager.selected_card, "library" if kind == "bottom" else kind, kind != "bottom", str(target.get_selected_metadata()))
@@ -71,10 +72,13 @@ func set_hidden(hidden: bool) -> void:
 		card.set_face_down(hidden)
 	controls.manager.match_controller.refresh()
 func build_library(rows: Node, target: OptionButton) -> void:
+	controls.button(rows,"Change Deck Back",func() -> void: controls.manager.appearance.sleeves.open(str(target.get_selected_metadata())))
 	library_n = number(rows, "Number of cards / Position N")
+	(func() -> void: controls.manager.match_controller.library_actions.placement_toggle(rows)).call_deferred()
 	var grid := GridContainer.new()
 	grid.columns = 3
 	rows.add_child(grid)
+	controls.button(grid,"Top N → Battlefield",func() -> void: controls.manager.match_controller.library_actions.play_top(str(target.get_selected_metadata()),int(library_n.value)))
 	controls.button(grid, "Draw 1", func() -> void: controls.manager.match_controller.draw_card(str(target.get_selected_metadata())))
 	controls.button(grid, "Draw N", func() -> void: controls.manager.match_controller.library_actions.draw_n(str(target.get_selected_metadata()), int(library_n.value)))
 	controls.button(grid, "Shuffle", func() -> void: controls.manager.match_controller.shuffle_library(str(target.get_selected_metadata())))
@@ -85,7 +89,9 @@ func build_library(rows: Node, target: OptionButton) -> void:
 		controls.manager.match_controller.open_library_view(str(target.get_selected_metadata())))
 	controls.button(grid, "Search Library…", func() -> void: controls.inspect(str(target.get_selected_metadata()), "library"))
 	controls.button(grid, "Mill N", func() -> void: controls.manager.match_controller.library_actions.mill_n(str(target.get_selected_metadata()), int(library_n.value)))
+	controls.button(grid, "Mill N from Bottom", func() -> void: controls.manager.match_controller.library_actions.mill_bottom(str(target.get_selected_metadata()), int(library_n.value)))
 	controls.button(grid, "Scry N…", func() -> void: controls.manager.match_controller.review.open_review(str(target.get_selected_metadata()), int(library_n.value), true))
+	controls.button(grid,"Surveil N…",func() -> void: controls.manager.match_controller.review.open_review(str(target.get_selected_metadata()),int(library_n.value),true,true))
 	controls.label(rows, "Selected card → this library")
 	var insertions := GridContainer.new()
 	insertions.columns = 2

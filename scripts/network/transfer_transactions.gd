@@ -57,7 +57,7 @@ func unresolved(row: Dictionary, message: String) -> void:
 func commit_sender(row: Dictionary) -> void:
 	if row.phase == "prepared":
 		var card: Control = c().card_by_id(row.id)
-		if card == null or card.state.current_zone not in ["hand","library"] or card.state.zone_player_id != "local":
+		if card == null or card.state.current_zone not in ["hand","library","custom_pile"] or card.state.zone_player_id != "local":
 			unresolved(row,"The original card no longer matches its prepared location.")
 			return
 		# Record the decision before removing the source or sending commit.
@@ -145,7 +145,9 @@ func receive(f: Dictionary) -> void:
 				elif prior.phase == "committed": send("committed",f.tx,{"id":prior.id})
 			return
 		var grant: RefCounted = router.hidden.outgoing
-		if grant == null or grant.state != "approved" or grant.id != d.request or router.hidden.now() > grant.expires or not grant.rows.any(func(row: Dictionary) -> bool: return row.id == d.card.id): return
+		var table_grant: bool = router.table.custom_table != null and router.table.custom_table.enabled and router.table.custom_table.pile_sync.permits(d.request)
+		if not table_grant and (grant == null or grant.state != "approved" or grant.id != d.request or router.hidden.now() > grant.expires or not grant.rows.any(func(row: Dictionary) -> bool: return row.id == d.card.id)): return
+		if table_grant: router.table.custom_table.pile_sync.grants.erase(d.request)
 		if is_locked(d.card.id) or not room(): return
 		var row: Dictionary = {"tx":f.tx,"id":d.card.id,"side":"receiver","phase":"prepared","card":d.card.duplicate(true),"revealed":d.revealed,"request":d.request}
 		records[f.tx] = row

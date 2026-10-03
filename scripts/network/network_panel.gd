@@ -242,6 +242,10 @@ func connect_if_online(action: Callable) -> void:
 	if gameplay != null and gameplay.table != null and gameplay.table.match_controller.playtest.local_playtest():
 		internet_status.text = "Choose Online Opponent in Menu → Hand before connecting."
 		return
+	var shell: Node=get_parent().get("app_shell")
+	if shell!=null and shell.updater!=null:
+		if not await shell.updater.allow_online(): return
+		if gameplay!=null and gameplay.table.match_controller.playtest.local_playtest(): return
 	action.call()
 
 func _process(_delta: float) -> void:
@@ -258,6 +262,7 @@ func apply_starting_life() -> void:
 	if gameplay.table == null: return
 	var c: Node = gameplay.table.match_controller
 	c.change_life("local",int(starting_life.value)-c.model.players.local.life)
+	if gameplay.table.battle!=null: gameplay.table.battle.reset.start.life.local=int(starting_life.value)
 
 func simple_reconnect() -> void:
 	if not gameplay.recovery.context.is_empty(): gameplay.recovery.reconnect()

@@ -168,14 +168,20 @@ func _ready() -> void:
 		var card: Control = inspected_card()
 		if card != null:
 			move_card(card, "library", false, inspection_player))
+	library_actions.placement_toggle(list_rows)
 	var extra := HBoxContainer.new()
 	list_rows.add_child(extra)
 	for destination: String in ["battlefield","graveyard","exile"]:
 		button(extra,destination.capitalize(),func() -> void:
-			if remote_inspection: public_sync.hidden.move_selected(destination)
+			if remote_inspection:
+				if destination=="battlefield" and library_actions.enter_face_down:
+					manager.controls.status.text="Ask the player holding this private card to place it face down."
+				else: public_sync.hidden.move_selected(destination)
 			else:
 				var card: Control = inspected_card()
-				if card != null: move_card(card,destination,true,inspection_player))
+				if card != null:
+					if destination=="battlefield": library_actions.place_cards([card.state.match_instance_id],library_actions.beside_library(inspection_player),library_actions.enter_face_down)
+					else: move_card(card,destination,true,inspection_player))
 	var nth := SpinBox.new()
 	nth.min_value = 1
 	nth.max_value = 5001
@@ -255,9 +261,11 @@ func load_deck(deck: Dictionary, leaders_out: bool, player_id: String = "local")
 		if old != null:
 			remove_card(old)
 	player.loaded_ids.clear()
+	player.deck_back = deck.get("deck_back",{}).duplicate(true)
 	batching = true
 	var placed_leaders: Array[String] = []
 	for card: Control in spawned:
+		if deck.has("deck_back"): card.state.custom_metadata["deck_back"]=deck.deck_back.duplicate(true)
 		card.state.owner_player_id = player_id
 		card.state.controller_player_id = player_id
 		player.loaded_ids.append(card.state.match_instance_id)
@@ -278,12 +286,14 @@ func load_deck(deck: Dictionary, leaders_out: bool, player_id: String = "local")
 		card.set_selected(false)
 	refresh()
 	preload("res://scripts/usability/deck_preferences.gd").new().used(str(deck.deck_id))
+	if manager.battle!=null: manager.battle.reset.start.remember("standard",player_id,deck,leaders_out)
 	return {"count": spawned.size()}
 var search_player: String = ""
 func destroy_token(card: Control) -> void:
 	record_event("token_destroyed", actor_name() + " destroyed a token", {"instance_id": card.state.match_instance_id})
 	remove_card(card)
 func remove_card(card: Control) -> void:
+	if manager.custom_table != null: manager.custom_table.detach(card)
 	if manager.selection != null:
 		manager.selection.ids.erase(card.state.match_instance_id)
 	for player: RefCounted in model.players.values():
@@ -309,7 +319,7 @@ func zone_for(kind: String, player_id: String = "local") -> Control:
 	zone.custom_minimum_size = Vector2(145, 210)
 	zone.size = zone.custom_minimum_size
 	return zone
-func move_card(card: Control, kind: String, on_top: bool = true, player_id: String = "local", authorized: bool = false) -> bool:
+func move_card(card: Control, kind: String, on_top: bool = true, player_id: String = "local", authorized: bool = false, enter_hidden: bool = false) -> bool:
 	if manager.undo != null:
 		manager.undo.begin("Move card")
 		manager.undo.finish.call_deferred()
@@ -326,6 +336,7 @@ func move_card(card: Control, kind: String, on_top: bool = true, player_id: Stri
 		destroy_token(card)
 		refresh()
 		return true
+	if manager.custom_table != null: manager.custom_table.detach(card)
 	var zone: Control = null
 	if kind in ["graveyard", "exile", "commander"]:
 		zone = zone_for(kind, player_id)
@@ -342,11 +353,14 @@ func move_card(card: Control, kind: String, on_top: bool = true, player_id: Stri
 	card.state.current_zone = kind
 	card.state.zone_player_id = player_id
 	# Ownership/control are deliberately not changed by moving a card.
-	card.set_face_down(kind == "library")
+	card.set_face_down(kind == "library" or (kind == "battlefield" and enter_hidden))
 	card.state.visibility = "owner_private" if kind in ["library", "hand"] else "public"
 	card.set_tapped(false)
-	if publicly_revealed:
+	if publicly_revealed and not enter_hidden:
 		visibility.set_public_reveal(card.state, true)
+	if enter_hidden:
+		visibility.set_public_reveal(card.state,false)
+		card.set_face_down(true)
 	if kind == "library":
 		model.players[player_id].library.put(card.state.match_instance_id, on_top)
 	elif kind == "battlefield":
@@ -551,7 +565,7 @@ func refresh_contents() -> void:
 		if card == null: continue
 		var shown: bool = visibility.can_see(card.state,"local") if inspection_zone in ["hand","library"] else visibility.can_present(card.state,"local")
 		if not contents_query.text.is_empty() and (not shown or not card.state.display_name.to_lower().contains(contents_query.text.to_lower())): continue
-		contents_list.add_item("%d. %s" % [i+1,card.state.display_name if shown else "Hidden card"],card.card_image.texture if shown else manager.backs.texture())
+		contents_list.add_item("%d. %s" % [i+1,card.state.display_name if shown else "Hidden card"],card.card_image.texture if shown else preload("res://scripts/battle/deck_back.gd").for_card(card,manager.backs))
 		contents_list.set_item_metadata(contents_list.item_count - 1, ids[i])
 func refresh() -> void:
 	if count == null or batching:
@@ -563,7 +577,7 @@ func refresh() -> void:
 	count.tooltip_text = deck_name
 	for card: Control in manager.cards:
 		card.state.identity_visible = visibility.can_present(card.state, "local")
-		card.card_back.texture = manager.backs.texture(str(card.state.custom_metadata.get("card_back_id", "")))
+		card.card_back.texture = preload("res://scripts/battle/deck_back.gd").for_card(card,manager.backs)
 		card.card_back.visible = card.state.face_down or not card.state.identity_visible
 		if card.state.is_token:
 			card.update_token_display()
@@ -583,9 +597,9 @@ func refresh() -> void:
 		public_faces.append(card.card_image.texture if visibility.can_present(card.state, "local") or playtest.local_playtest() else null)
 	if online():
 		var presentation: Dictionary = public_sync.serializer.projection.remote_hand()
-		opponent_hand.present(hidden_count("opponent", "hand"), manager.backs.texture(), presentation.faces, presentation.names)
+		opponent_hand.present(hidden_count("opponent", "hand"), manager.backs.texture(), presentation.faces, presentation.names, manager.deck_backs.hand_textures("opponent"))
 	else:
-		opponent_hand.present(hidden_count(far_player, "hand"), manager.backs.texture(), [] if remote_hand_count >= 0 else public_faces)
+		opponent_hand.present(hidden_count(far_player, "hand"), manager.backs.texture(), [] if remote_hand_count >= 0 else public_faces, [], manager.deck_backs.hand_textures(far_player))
 		if playtest.local_playtest(): opponent_hand.label.text = model.players[far_player].display_name+" hand: "+str(hidden_count(far_player,"hand"))
 	opponent_hand.visible = manager.active and not hands_hidden
 	hand.visible = manager.active and not hands_hidden and hand_open and (not loaded_ids.is_empty() or hand.row.get_child_count() > 0)
@@ -594,6 +608,7 @@ func refresh() -> void:
 	manager.controls.update_selection()
 	if manager.has_method("refresh_match_summary"):
 		manager.refresh_match_summary()
+	if manager.custom_table != null: manager.custom_table.refresh_presentation()
 func set_active(value: bool) -> void:
 	pile_view.visible = value
 	opponent_pile.visible = value
@@ -610,9 +625,10 @@ func set_active(value: bool) -> void:
 func actor_name() -> String:
 	return model.players[model.active_player].display_name
 func record_event(kind: String, message: String, payload: Dictionary = {}) -> Dictionary:
+	if manager.battle!=null and manager.battle.reset.rebuilding: return {}
 	if manager.undo != null: manager.undo.event(kind)
 	if online() and not public_sync.applying:
-		public_sync.capture_event.call_deferred(kind, payload.duplicate(true))
+		manager.battle.queue_event(kind,payload)
 	var event: Dictionary = {"event_id": Crypto.new().generate_random_bytes(16).hex_encode(), "kind": kind, "actor": model.active_player, "turn": model.turn_number, "text": message, "payload": payload.duplicate(true)}
 	model.history.append(event)
 	if model.history.size() > 1000:
@@ -647,7 +663,7 @@ func library_rows(player: String) -> Array:
 	var rows: Array = []
 	var order: Array = model.players[player].library.order
 	for slot: int in hidden_count(player,"library"):
-		var row: Dictionary = {"slot":slot,"id":"","name":"Hidden card","texture":manager.backs.texture(),"known":false}
+		var row: Dictionary = {"slot":slot,"id":"","name":"Hidden card","texture":manager.deck_backs.library_texture(player),"known":false}
 		if player == "opponent" and remote_library_count >= 0:
 			var memory: Dictionary = remote_library_knowledge.get(str(slot),{})
 			if not memory.is_empty() and public_sync != null:
@@ -662,6 +678,7 @@ func library_rows(player: String) -> Array:
 			var card: Control = card_by_id(order[slot])
 			if card != null:
 				row.id = card.state.match_instance_id
+				row.texture = preload("res://scripts/battle/deck_back.gd").for_card(card,manager.backs)
 				row.known = Knowledge.known(card.state,"local")
 				if row.known:
 					row.name = card.state.display_name
@@ -672,7 +689,7 @@ func inspection_texture(index: int, card: Control) -> Texture2D:
 	if knowledge_view: return contents_list.get_item_icon(index)
 	if card == null: return null
 	var shown: bool = visibility.can_see(card.state,"local") if inspection_zone in ["hand","library"] else visibility.can_present(card.state,"local")
-	return card.hover_preview.texture if shown else manager.backs.texture()
+	return card.hover_preview.texture if shown else preload("res://scripts/battle/deck_back.gd").for_card(card,manager.backs)
 
 func open_public_zone(player: String, kind: String) -> void:
 	if kind not in ["graveyard","exile","commander"]: return

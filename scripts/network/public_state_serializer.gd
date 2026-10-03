@@ -36,6 +36,7 @@ func public_card(card: Control) -> Dictionary:
 		"position": encode_position(card.position), "tapped": card.tapped, "face_down": hidden, "counters": s.counters.duplicate(true), "token": s.is_token,
 		"power": "" if hidden else str(s.custom_metadata.get("power", "")), "toughness": "" if hidden else str(s.custom_metadata.get("toughness", ""))}
 	if not hidden and s.faces.size()>1: result["face_index"] = s.active_face_index
+	if s.custom_metadata.has("deck_back"): result["deck_back"]=s.custom_metadata.deck_back.duplicate(true)
 	return result
 func capture() -> Dictionary:
 	var table: Node = router.table
@@ -43,7 +44,7 @@ func capture() -> Dictionary:
 	c.model.synchronize(table.cards)
 	var result: Dictionary = {"cards": {}, "counters": {}, "players": {}, "order": [], "turn": {"number": c.model.turn_number, "active": global_player(c.model.active_player)}, "history": []}
 	for card: Node in table.world.get_children():
-		if not card in table.cards or card.state.current_zone in ["hand", "library"]: continue
+		if not card in table.cards or card.state.current_zone in ["hand", "library", "custom_pile"]: continue
 		# Do not publish the unimported Godot demonstration card.
 		if card.state.card_definition_id.is_empty() and not card.state.is_token and not router.state.cards.has(card.state.match_instance_id): continue
 		result.cards[card.state.match_instance_id] = public_card(card)
@@ -88,6 +89,7 @@ func apply_card(data: Dictionary) -> void:
 		s.custom_metadata["power"] = data.power
 		s.custom_metadata["toughness"] = data.toughness
 		table.apply_card_art(card)
+	if data.has("deck_back"): s.custom_metadata["deck_back"]=data.deck_back.duplicate(true)
 	s.owner_player_id = local_player(data.owner)
 	s.controller_player_id = local_player(data.controller)
 	s.zone_player_id = local_player(data.holder)

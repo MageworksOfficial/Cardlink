@@ -6,6 +6,7 @@ var storage: RefCounted
 var capture_data: Callable
 var apply_data: Callable
 var validator: Callable
+var save_override: Callable
 var confirm_load: bool = false
 var picker: OptionButton
 var name_edit: LineEdit
@@ -57,6 +58,7 @@ func finish(result: Dictionary) -> void:
 	message.text = str(result.get("error", "Done."))
 	refresh()
 func save_current() -> void:
+	if save_override.is_valid() and save_override.call(): return
 	var data: Dictionary = capture_data.call()
 	if validator.is_valid():
 		var error: String = validator.call(data)

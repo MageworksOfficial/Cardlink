@@ -19,7 +19,20 @@ static func safe_text(value: Variant, limit: int) -> bool:
 		if value.unicode_at(c) < 32 or value.unicode_at(c) == 127:
 			return false
 	return true
+const EPOCH_TYPES = ["game","hidden_zone","transfer_tx","table_structure","card_sync"]
 static func valid(message: Dictionary) -> bool:
+	if message.has("match_epoch"):
+		if not message.get("type") in EPOCH_TYPES and not (message.get("type")=="recovery" and message.get("kind") not in ["hello","challenge","proof"]): return false
+		if not preload("res://scripts/battle/battle_protocol.gd").identifier(message.match_epoch): return false
+		message=message.duplicate(true);message.erase("match_epoch")
+	if message.get("type")=="ready" and message.has("save_state_version"):
+		if message.save_state_version!=3: return false
+		message=message.duplicate(true);message.erase("save_state_version")
+	if message.get("type") == "battle": return preload("res://scripts/battle/battle_protocol.gd").valid(message)
+	if message.get("type") in ["hello","welcome"] and message.has("battle_version"):
+		if message.battle_version!=1 or not message.get("reset_pending") is bool: return false
+		message=message.duplicate(true);message.erase("battle_version");message.erase("reset_pending")
+	if message.get("type") == "table_structure": return preload("res://scripts/custom_table/table_protocol.gd").valid(message)
 	if message.get("type") == "recovery":
 		return preload("res://scripts/network/recovery_protocol.gd").valid(message)
 	if message.get("type") == "transfer_tx":
@@ -56,7 +69,7 @@ static func encode(message: Dictionary) -> PackedByteArray:
 	if not valid(message):
 		return PackedByteArray()
 	var bytes: PackedByteArray = JSON.stringify(message).to_utf8_buffer()
-	if bytes.size() > (MAX_FRAME if message.get("type") in ["game", "card_sync", "hidden_zone", "recovery", "transfer_tx"] else MAX_BYTES):
+	if bytes.size() > (MAX_FRAME if message.get("type") in ["game", "card_sync", "hidden_zone", "recovery", "transfer_tx", "table_structure", "battle"] else MAX_BYTES):
 		return PackedByteArray()
 	bytes.append(10)
 	return bytes
@@ -66,7 +79,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 	var json := JSON.new()
 	if json.parse(bytes.get_string_from_utf8()) != OK or not json.data is Dictionary or not valid(json.data):
 		return {}
-	if bytes.size() > MAX_BYTES and not json.data.get("type") in ["game","card_sync","hidden_zone", "recovery", "transfer_tx"]:
+	if bytes.size() > MAX_BYTES and not json.data.get("type") in ["game","card_sync","hidden_zone", "recovery", "transfer_tx", "table_structure", "battle"]:
 		return {}
 	return json.data
 static func valid_utf8(bytes: PackedByteArray) -> bool:

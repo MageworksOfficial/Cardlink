@@ -86,3 +86,16 @@ export_credentials.cfg
 /PRODUCTION_CLIENT.md
 /INTERNET_ACCEPTANCE_7.md
 /SYNC_CARDS_FIX.md
+
+# Local evidence and archived tutorial; keep files on disk, outside public source.
+/CARDLINK_DAILY_HANDOFF_*.md
+/CARDLINK_V0851_FRIDAY_RELEASE_PREP.md
+/CARDLINK_CUSTOM_HAND_REFRESH_QA.md
+/V0.8.5.1_Match_Save_Capability_Hotfix_Report.md
+/SERVER_UPDATE_V083/
+/docs/builder_ux_review/
+/docs/card_qol_review/
+/docs/tutorial/7.8.1/
+/docs/CardLink-7.8.1-Beta-Tutorial.md
+/CardLink-7.8.1-Beta-Tutorial.pdf
+/MILESTONE/

@@ -30,8 +30,12 @@ position = lambda v: isinstance(v,list) and len(v)==2 and all(num(-10,10)(x) for
 player = one(*PLAYERS)
 counters = lambda v: isinstance(v,dict) and len(v)<=24 and all(text(48)(k) and num(0,1000000)(x) for k,x in v.items())
 card_fields = dict(zone_ref=text(),id=lambda v:text(80)(v) and bool(v),definition=text(),name=text(),art=art,owner=player,controller=player,holder=player,zone=one('battlefield','graveyard','exile','commander','custom','custom_zone'),position=position,tapped=boolean,face_down=boolean,counters=counters,token=boolean,power=text(),toughness=text())
-def card(v): return isinstance(v,dict) and set(card_fields)<=set(v)<=set(card_fields)|{"face_index"} and all(check(v[k]) for k,check in card_fields.items()) and ("face_index" not in v or integer(0,15)(v["face_index"])) and (not v['token'] or v['zone'] in ('battlefield','custom','custom_zone'))
-def card_update(v): return isinstance(v,dict) and 'id' in v and set(v)<=set(card_fields)|{'face_index'} and all((integer(0,15) if k=='face_index' else card_fields[k])(x) for k,x in v.items())
+def deck_back(v):
+    presets=('Black','White','Gray','Red','Orange','Yellow','Green','Blue','Purple','Brown')
+    return obj(type=one('default','preset','color','image'),color=lambda c:isinstance(c,str) and re.fullmatch(r'#[0-9a-fA-F]{6}',c) is not None,preset=text(16),asset=text(64))(v) and (v['type']!='preset' or v['preset'] in presets) and (v['asset']=='' or (v['type']=='image' and hash_ok(v['asset'])))
+
+def card(v): return isinstance(v,dict) and set(card_fields)<=set(v)<=set(card_fields)|{"face_index","deck_back"} and all(check(v[k]) for k,check in card_fields.items()) and ("face_index" not in v or integer(0,15)(v["face_index"])) and ("deck_back" not in v or deck_back(v["deck_back"])) and (not v['token'] or v['zone'] in ('battlefield','custom','custom_zone'))
+def card_update(v): return isinstance(v,dict) and 'id' in v and set(v)<=set(card_fields)|{'face_index','deck_back'} and all((integer(0,15) if k=='face_index' else deck_back if k=='deck_back' else card_fields[k])(x) for k,x in v.items())
 counter = obj(id=lambda v:text(80)(v) and bool(v),position=position,value=num(-1000000,1000000),label=text(80))
 event = obj(id=text(80),kind=text(32),actor=player,text=text(500))
 zone = obj(id=text(80),kind=one('library','deck','graveyard','exile','commander','battlefield','custom','custom_zone'),player=player,name=text(),position=position,size=lambda v:isinstance(v,list) and len(v)==2 and num(20,2304)(v[0]) and num(20,1296)(v[1]),capacity=num(0,5000))
@@ -62,6 +66,16 @@ tx=dict(summary_request=obj(),prepare=obj(request=identifier,card=card,revealed=
 families={'card_sync':(sync,{'run':identifier}),'hidden_zone':(hidden,{'request_id':identifier}),'recovery':(recovery,{}),'transfer_tx':(tx,{'tx':identifier})}
 def safe_text(n): return lambda v:text(n)(v) and bool(v) and all(ord(x)>=32 and ord(x)!=127 for x in v)
 def valid(v,protocol=1,session_id=None):
+    if isinstance(v,dict) and 'match_epoch' in v:
+        if not hexstr(32)(v['match_epoch']): return False
+        if v.get('type') not in ('game','hidden_zone','transfer_tx','table_structure','card_sync') and not (v.get('type')=='recovery' and v.get('kind') not in ('hello','challenge','proof')): return False
+        v={k:x for k,x in v.items() if k!='match_epoch'}
+    if isinstance(v,dict) and v.get('type')=='battle':
+        from battle_protocol import valid as valid_battle
+        return protocol==1 and valid_battle(v,session_id)
+    if isinstance(v,dict) and v.get("type")=="table_structure":
+        from table_protocol import valid as valid_table
+        return protocol==1 and valid_table(v,session_id)
     if not isinstance(v,dict) or not isinstance(v.get('type'),str) or not integer(1,65535)(v.get('protocol')) or v['protocol']!=protocol: return False
     kind=v['type']
     common={'type':one(kind),'protocol':integer(1,65535)}
@@ -75,6 +89,7 @@ def valid(v,protocol=1,session_id=None):
     if kind in ('hello','welcome'):
         fields=dict(app_version=safe_text(24),player_id=one('player_1' if kind=='welcome' else 'player_2'),role=one('host' if kind=='welcome' else 'guest'),display_name=safe_text(48),session_id=hexstr(32))
         if kind=='hello' and 'join_key' in v: fields['join_key']=hexstr(32)
+        if 'battle_version' in v: fields.update(battle_version=one(1),reset_pending=boolean)
         return obj(**common,**fields)(v)
     if kind=='ready': return obj(**common,session_id=hexstr(32))(v)
     if kind=='reject': return obj(**common,reason=one('protocol_mismatch','invalid_message'))(v)
@@ -90,6 +105,6 @@ def decode(line,protocol=1,session_id=None):
     try:
         value=json.loads(line.decode('utf-8'),object_pairs_hook=pairs,parse_constant=lambda _:None)
         if not valid(value,protocol,session_id): return None
-        if value['type'] not in ('game',*families) and len(line)>2049: return None
+        if value['type'] not in ('game','table_structure','battle',*families) and len(line)>2049: return None
         return value
     except (ValueError,TypeError,KeyError,RecursionError,OverflowError): return None
