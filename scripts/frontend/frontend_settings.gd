@@ -43,7 +43,7 @@ func _ready() -> void:
 	rows.add_child(save_button)
 	rows.move_child(save_button,3)
 	layout_button = Button.new()
-	layout_button.text = "Table layout & displayâ€¦"
+	layout_button.text = "Table layout & display..."
 	layout_button.tooltip_text = "Layout presets and UI text scale are available inside a table."
 	layout_button.pressed.connect(func() -> void:
 		title.close_settings()
@@ -61,11 +61,11 @@ func _ready() -> void:
 	key_bindings.bindings = shell.bindings
 	shell.add_child(key_bindings)
 	var key_button := Button.new()
-	key_button.text = "Key Bindingsâ€¦"
+	key_button.text = "Key Bindings..."
 	key_button.pressed.connect(func() -> void: key_bindings.popup_centered_clamped(Vector2i(640,560),0.95))
 	rows.add_child(key_button)
 	var integrations := Button.new()
-	integrations.text="Integrations / Optional Catalogâ€¦"
+	integrations.text="Integrations / Optional Catalog..."
 	integrations.pressed.connect(func() -> void: preload("res://scripts/integrations/integration_hub.gd").open(shell,2))
 	rows.add_child(integrations)
 	var about_button := Button.new()
@@ -116,7 +116,7 @@ func _ready() -> void:
 	var welcome_rows := VBoxContainer.new()
 	welcome.add_child(welcome_rows)
 	var introduction := Label.new()
-	introduction.text = "Welcome to CardLink\nLeft drag â€” Move Â· Right click â€” Actions\n"+shell.bindings.caption("draw")+" â€” Draw Â· "+shell.bindings.caption("shuffle")+" â€” Shuffle\n"+shell.bindings.caption("hands")+" â€” Hands Â· "+shell.bindings.caption("layout")+" â€” Layout Â· "+shell.bindings.caption("end_turn")+" â€” End Turn\nFull Controls and Key Bindings are in Settings."
+	introduction.text = "Welcome to CardLink\nLeft drag - Move | Right click - Actions\n"+shell.bindings.caption("draw")+" - Draw | "+shell.bindings.caption("shuffle")+" - Shuffle\n"+shell.bindings.caption("hands")+" - Hands | "+shell.bindings.caption("layout")+" - Layout | "+shell.bindings.caption("end_turn")+" - End Turn\nFull Controls and Key Bindings are in Settings."
 	welcome.dialog_text = ""
 	welcome_rows.add_child(introduction)
 	no_again = CheckBox.new()
@@ -137,7 +137,7 @@ func open() -> void:
 	if panel != null:
 		auto_approve.set_pressed_no_signal(panel.gameplay.hidden.auto_approve)
 	name_edit.editable = panel == null or panel.network.available()
-	name_edit.tooltip_text = "Disconnect before changing your session name." if not name_edit.editable else "Your display name Â· up to 48 characters"
+	name_edit.tooltip_text = "Disconnect before changing your session name." if not name_edit.editable else "Your display name | up to 48 characters"
 	shell.title_screen.backs.reload()
 	shell.title_screen.back_preview.texture = shell.title_screen.backs.texture()
 	shell.title_screen.settings.popup_centered_clamped(Vector2i(480,580),0.95)

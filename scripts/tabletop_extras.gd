@@ -204,10 +204,10 @@ func refresh_history() -> void:
 	if history_text == null:
 		return
 	var model: RefCounted = manager.match_controller.model
-	turn_label.text = "Turn %d â€” %s" % [model.turn_number, model.players[model.active_player].display_name]
+	turn_label.text = "Turn %d - %s" % [model.turn_number, model.players[model.active_player].display_name]
 	var lines: PackedStringArray = []
 	for event: Dictionary in model.history:
-		lines.append(event.text if event.kind == "turn" else "Turn %d Â· %s\n%s" % [event.turn, model.players[event.actor].display_name, event.text])
+		lines.append(event.text if event.kind == "turn" else "Turn %d | %s\n%s" % [event.turn, model.players[event.actor].display_name, event.text])
 	history_text.text = "\n\n".join(lines)
 func build_counter_editor() -> void:
 	counter_window = make_window("Counter Properties", Vector2i(360, 260))
