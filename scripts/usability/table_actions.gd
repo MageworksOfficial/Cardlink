@@ -12,6 +12,7 @@ func execute(action: String, event: InputEventKey = null) -> void:
 	if action == "undo": manager.undo.undo(); return
 	manager.undo.begin(str(manager.shortcuts.bindings.ACTIONS.get(action,[action])[0]))
 	match action:
+		"untap_all": manager.lab.untap_all()
 		"reset_match": manager.battle.reset.open()
 		"background_edit": manager.appearance.toggle_edit()
 		"play_top": c.library_actions.play_active()

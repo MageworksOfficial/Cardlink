@@ -2,7 +2,7 @@ extends RefCounted
 const VERSION = "7.8.1"
 const UPDATE_VERSION = "0.8.5.2-beta"
 const CHANNEL = "Beta"
-const LABEL = "CardLink 7 V0.8.5.2 Beta"
+const LABEL = "CardLink 7 PLAYTEST - Review Tray"
 # Set only after the public project exists.
 const PROJECT_URL = ""
 # Presentation release and wire compatibility are deliberately separate.

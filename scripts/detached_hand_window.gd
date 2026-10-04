@@ -19,7 +19,7 @@ var drag_steps: Array[String] = []
 func _ready() -> void:
 	window = Window.new()
 	window.name = "PrivateHandWindow"
-	window.title = "CardLink · Private Hand"
+	window.title = "CardLink Â· Private Hand"
 	window.visible = false
 	window.force_native = true
 	window.transient = false
@@ -36,7 +36,7 @@ func _ready() -> void:
 	rows.add_child(buttons)
 	controller.button(buttons,"Draw",func() -> void: controller.draw_card(controller.active_hand_player()))
 	controller.button(buttons,"View Library",func() -> void: controller.open_library_view(controller.active_hand_player()))
-	controller.button(buttons,"Selected → Hand",func() -> void: controller.move_card(controller.manager.selected_card,"hand",true,controller.active_hand_player()))
+	controller.button(buttons,"Selected â†’ Hand",func() -> void: controller.move_card(controller.manager.selected_card,"hand",true,controller.active_hand_player()))
 	controller.button(buttons,"Restore to Main Window",restore_hand)
 	preview = TextureRect.new()
 	preview.custom_minimum_size = Vector2(100,140)
@@ -97,7 +97,7 @@ func restore_hand() -> void:
 	preview.texture = null
 	controller.refresh()
 func refresh() -> void:
-	window.title = "CardLink · "+controller.model.players[controller.active_hand_player()].display_name+" Hand"
+	window.title = "CardLink Â· "+controller.model.players[controller.active_hand_player()].display_name+" Hand"
 	if detached:
 		window.visible = controller.manager.active and not controller.hands_hidden
 		if not window.visible: cancel_drag()
@@ -114,7 +114,7 @@ func begin_drag(id: String) -> void:
 	ghost.texture = card.card_image.texture
 	hand_ghost.texture = card.card_image.texture
 	set_drag_phase("drag_preview_active")
-	drag_hint.text = "Dragging card · Release on battlefield · Esc cancels"
+	drag_hint.text = "Dragging card Â· Release on battlefield Â· Esc cancels"
 	drag_hint.show()
 	update_drag_preview(drag_origin,window.get_window_id())
 func drop_on_field(id: String, viewport_point: Vector2) -> bool:
@@ -166,6 +166,12 @@ func cancel_drag() -> void:
 	if drag_hint != null: drag_hint.hide()
 func finish_screen_drop(point: Vector2, target: int) -> void:
 	var main: Window = controller.get_tree().root
+	if not drag_id.is_empty() and target==window.get_window_id():
+		for item: Control in controller.hand.row.get_children():
+			var local_point: Vector2=item.get_screen_transform().affine_inverse()*point
+			if Rect2(Vector2.ZERO,item.size).has_point(local_point):
+				item._drop_data(local_point,{"cardlink_instance":drag_id})
+				cancel_drag();return
 	if not drag_id.is_empty() and point.distance_to(drag_origin)>8 and target == main.get_window_id():
 		var local_point: Vector2 = main.get_screen_transform().affine_inverse()*point
 		if controller.manager.view.over_field(local_point):

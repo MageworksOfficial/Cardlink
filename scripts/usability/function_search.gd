@@ -56,6 +56,8 @@ func build_entries() -> void:
 	add("Edit Battlefield Background","background transform",m.appearance.toggle_edit)
 	add("Reset Battlefield Background","default playmat",m.appearance.reset_background)
 	add("Arrange Selected","arrange organize stack fan line up spread distribute",m.selection.arrange.open)
+	add("PLAYTEST Review Tray","look reveal until top cards",m.lab.open)
+	add("PLAYTEST Spawn Temporary Image","map meld visual aid",m.temporary_images.choose)
 	add("Create Token","name art power toughness",m.extras.choose.bind("Token"))
 	add("Loyalty Counter","add remove plus minus card",func() -> void: preload("res://scripts/battle/loyalty.gd").open(m))
 	add("Reset Match / Rematch…","restart game",m.battle.reset.open)

@@ -32,7 +32,7 @@ func public_card(card: Control) -> Dictionary:
 	var result: Dictionary = {"zone_ref": projection.zone_key(router.table.find_zone(s.zone_id)) if router.table.find_zone(s.zone_id) != null else "", "id": s.match_instance_id, "definition": "" if hidden else s.card_definition_id,
 		"name": "Face-down card" if hidden else s.display_name, "art": "" if hidden else art,
 		"owner": global_player(s.owner_player_id), "controller": global_player(s.controller_player_id), "holder": global_player(s.zone_player_id),
-		"zone": s.current_zone if s.current_zone in ["battlefield", "graveyard", "exile", "commander", "custom", "custom_zone"] else "battlefield",
+		"zone": "custom_zone" if s.current_zone=="review" else s.current_zone if s.current_zone in ["battlefield", "graveyard", "exile", "commander", "custom", "custom_zone"] else "battlefield",
 		"position": encode_position(card.position), "tapped": card.tapped, "face_down": hidden, "counters": s.counters.duplicate(true), "token": s.is_token,
 		"power": "" if hidden else str(s.custom_metadata.get("power", "")), "toughness": "" if hidden else str(s.custom_metadata.get("toughness", ""))}
 	if not hidden and s.faces.size()>1: result["face_index"] = s.active_face_index
@@ -45,6 +45,7 @@ func capture() -> Dictionary:
 	var result: Dictionary = {"cards": {}, "counters": {}, "players": {}, "order": [], "turn": {"number": c.model.turn_number, "active": global_player(c.model.active_player)}, "history": []}
 	for card: Node in table.world.get_children():
 		if not card in table.cards or card.state.current_zone in ["hand", "library", "custom_pile"]: continue
+		if card.state.current_zone=="review" and c.visibility.stable_visibility(card.state)!="public":continue
 		# Do not publish the unimported Godot demonstration card.
 		if card.state.card_definition_id.is_empty() and not card.state.is_token and not router.state.cards.has(card.state.match_instance_id): continue
 		result.cards[card.state.match_instance_id] = public_card(card)
@@ -101,7 +102,7 @@ func apply_card(data: Dictionary) -> void:
 	table.assign_zone(card, zone, false)
 	c.transitioning = false
 	for player: RefCounted in c.model.players.values(): player.library.order.erase(data.id)
-	s.current_zone = data.zone
+	s.current_zone = "review" if s.current_zone=="review" and data.zone=="custom_zone" else data.zone
 	s.position = decode_position(data.position)
 	card.position = s.position
 	card.set_tapped(data.tapped)

@@ -40,6 +40,16 @@ func _get_drag_data(_point: Vector2) -> Variant:
 	set_drag_preview(icon)
 	controller.hide_preview()
 	return {"cardlink_instance": instance_id,"cardlink_instances":controller.library_actions.hand_drag_ids(instance_id)}
+func _can_drop_data(_point: Vector2,data: Variant) -> bool:
+	return data is Dictionary and data.has("cardlink_instance") and controller.library_actions.hand_drag_ids(str(data.cardlink_instance)).size()>0
+func _drop_data(point: Vector2,data: Variant) -> void:
+	var order: Array[String]=controller.model.players[controller.active_hand_player()].hand
+	var moving: Array[String]=controller.library_actions.hand_drag_ids(str(data.cardlink_instance))
+	if instance_id in moving:return
+	for id: String in moving:order.erase(id)
+	var index: int=order.find(instance_id)+(1 if point.x>size.x/2 else 0)
+	for i: int in moving.size():order.insert(index+i,moving[i])
+	controller.refresh()
 var held: bool = false
 var press_point: Vector2
 func _gui_input(event: InputEvent) -> void:

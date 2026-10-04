@@ -3,6 +3,8 @@ const CardScene = preload("res://scenes/card.tscn")
 const ZoneScene = preload("res://scenes/tabletop_zone.tscn")
 const Controls = preload("res://scripts/tabletop_controls.gd")
 var deck_preferences = preload("res://scripts/usability/deck_preferences.gd").new()
+var lab: Node
+var temporary_images: Node
 var appearance: Node
 var battle: Node
 var deck_backs: Node
@@ -106,6 +108,8 @@ func setup() -> void:
 	battle.manager=self
 	add_child(battle)
 	appearance=preload("res://scripts/appearance/table_appearance.gd").new();appearance.manager=self;add_child(appearance)
+	lab=preload("res://scripts/playtest_lab/review_tray.gd").new();lab.manager=self;add_child(lab)
+	temporary_images=preload("res://scripts/playtest_lab/temporary_images.gd").new();temporary_images.manager=self;add_child(temporary_images)
 	organization.reset_layout()
 	var feedback := preload("res://scripts/usability/table_feedback.gd").new()
 	feedback.manager = self

@@ -41,6 +41,9 @@ func fingerprint() -> String:
 func secret() -> PackedByteArray:
 	return Capsule.key(m().match_controller.loader.storage.directory.path_join("online_save_private.key"))
 func reason(host_only: bool=true) -> String:
+	for card: Control in m().cards:
+		if card.state.current_zone=="review":return "PLAYTEST: resolve your Review Tray before online Save/Load."
+	if m().temporary_images!=null and not m().temporary_images.objects.is_empty():return "PLAYTEST: remove temporary images before online Save/Load; local saves can retain them."
 	if not battle.connected(): return "Connect both players and load the original decks first."
 	if host_only and not r().is_host(): return "The original host requests Load Match; the other player approves."
 	if not n().peer is StreamPeerTCP and not n().relay_save_capable: return "Match Save requires an updated CardLink server."

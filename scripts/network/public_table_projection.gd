@@ -4,6 +4,7 @@ var source: WeakRef
 var serializer: RefCounted:
 	get: return source.get_ref()
 var textures: Dictionary = {}
+var public_hand_order: Array[String] = []
 func _init(owner: RefCounted) -> void: source = weakref(owner)
 func zone_key(zone: Control) -> String:
 	if zone.zone_type in ["graveyard","exile","commander"]:
@@ -62,8 +63,15 @@ func apply_zones() -> void:
 func own_hand() -> Array:
 	var c: Node = serializer.router.table.match_controller
 	var result: Array = []
-	for slot: int in c.model.players.local.hand.size():
-		var card: Control = c.card_by_id(c.model.players.local.hand[slot])
+	var current: Array[String]=c.model.players.local.hand
+	var kept: Array[String]=[]
+	for id: String in public_hand_order:
+		if id in current:kept.append(id)
+	for id: String in current:
+		if not id in kept:kept.append(id)
+	public_hand_order=kept
+	for slot: int in public_hand_order.size():
+		var card: Control = c.card_by_id(public_hand_order[slot])
 		if card == null or not card.state.custom_metadata.get("public_reveal",false): continue
 		result.append({"slot":slot,"definition":card.state.card_definition_id,"name":card.state.display_name,"art":serializer.art_hash(card.state.image_path)})
 	return result

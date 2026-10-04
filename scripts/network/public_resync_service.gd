@@ -15,6 +15,7 @@ func apply(value: Dictionary, sequence: int) -> void:
 	var c: Node = router.table.match_controller
 	router.applying = true
 	for card: Control in router.table.cards.duplicate():
+		if card.state.current_zone=="review" and card.state.visibility=="owner_private":continue
 		if not value.cards.has(card.state.match_instance_id) and not card.state.current_zone in ["hand", "library", "custom_pile"]:
 			if not router.state.cards.has(card.state.match_instance_id) and not card.state.is_token and not card.state.card_definition_id.is_empty():
 				c.move_card(card,"hand",true,"local",true)

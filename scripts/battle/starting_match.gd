@@ -53,6 +53,8 @@ func rebuild() -> String:
 	var c: Node=m.match_controller
 	var recipes: Array=usable()
 	reset.rebuilding=true
+	if m.temporary_images!=null:m.temporary_images.restore([])
+	if m.lab!=null:m.lab.window.hide()
 	c.search_player="";c.close_inspection();c.review.cancel()
 	c.visibility.end(c.model.instances)
 	m.undo.invalidate("New match started.")

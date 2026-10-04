@@ -19,6 +19,7 @@ func peer_save_capable() -> bool:
 signal recovery_received(message: Dictionary)
 signal transfer_received(message: Dictionary)
 signal hidden_received(message: Dictionary)
+signal playtest_image_received(message: Dictionary)
 signal table_received(message: Dictionary)
 signal game_received(message: Dictionary)
 signal card_sync_received(message: Dictionary)
@@ -238,6 +239,9 @@ func receive(message: Dictionary) -> void:
 			return
 		if message.type == "hidden_zone":
 			hidden_received.emit(message)
+			return
+		if message.type == "playtest_image":
+			playtest_image_received.emit(message)
 			return
 		if message.type == "table_structure":
 			table_received.emit(message)

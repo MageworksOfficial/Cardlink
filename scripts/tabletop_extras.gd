@@ -30,7 +30,7 @@ func _ready() -> void:
 	corner.id_pressed.connect(func(id: int) -> void: choose(FUNCTIONS[id]))
 	add_child(corner)
 	field_menu = PopupMenu.new()
-	for caption: String in ["Create Token", "Create Counter", "Add Custom Zone", "Reset View", "Tools", "Match History", "End Turn", "Add Table Component", "Battlefield Background", "Edit Background"]:
+	for caption: String in ["Create Token", "Create Counter", "Add Custom Zone", "Reset View", "Tools", "Match History", "End Turn", "Add Table Component", "Battlefield Background", "Edit Background", "PLAYTEST Spawn Temporary Image", "PLAYTEST Review Tray", "PLAYTEST Untap All I Control"]:
 		field_menu.add_item(caption)
 	field_menu.id_pressed.connect(field_action)
 	add_child(field_menu)
@@ -108,6 +108,9 @@ func field_action(id: int) -> void:
 		7: open_components()
 		8: manager.appearance.open()
 		9: manager.appearance.toggle_edit()
+		10: manager.temporary_images.choose()
+		11: manager.lab.open()
+		12: manager.lab.untap_all()
 func choose(caption: String) -> void:
 	match caption:
 		"Table":

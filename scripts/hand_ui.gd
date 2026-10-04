@@ -27,7 +27,9 @@ func refresh() -> void:
 		row.remove_child(item)
 		item.queue_free()
 	var count: int = 0
-	for card: Control in controller.manager.cards:
+	for id: String in controller.model.players[controller.active_hand_player()].hand:
+		var card: Control=controller.card_by_id(id)
+		if card==null: continue
 		if card.state.current_zone != "hand" or card.state.zone_player_id != controller.active_hand_player():
 			continue
 		count += 1

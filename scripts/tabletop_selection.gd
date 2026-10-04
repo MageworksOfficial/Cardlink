@@ -21,7 +21,7 @@ func _ready() -> void:
 	bulk.min_size=Vector2i(380,0)
 	bulk.add_theme_font_size_override("font_size",18)
 	bulk.add_theme_constant_override("v_separation",10)
-	for caption: String in ["Move All to Owner's Graveyard", "Move All to Owner's Exile", "Move All to Owner's Hand", "Put All on Owner's Library Top", "Put All on Owner's Library Bottom", "Controller: Local player", "Controller: Opponent", "Tap All", "Untap All", "Delete (cards → owner's graveyard)"]:
+	for caption: String in ["Move All to Owner's Graveyard", "Move All to Owner's Exile", "Move All to Owner's Hand", "Put All on Owner's Library Top", "Put All on Owner's Library Bottom", "Controller: Local player", "Controller: Opponent", "Tap All", "Untap All", "Delete (cards â†’ owner's graveyard)"]:
 		bulk.add_item(caption)
 	bulk.id_pressed.connect(func(index: int) -> void:
 		if index >= 0 and index < ACTIONS.size(): apply_batch(ACTIONS[index], ids.duplicate()))
@@ -48,6 +48,8 @@ func toggle(item: Control) -> void:
 	manager.selected_card=null
 	paint();manager.controls.update_selection()
 func open_bulk(source: Control, point: Vector2) -> void:
+	if manager.lab!=null and ids.any(func(id: String) -> bool: return id in manager.lab.ids()):
+		manager.lab.open();manager.lab.menu(ids.duplicate());return
 	arrange.update_menu()
 	manager.controls.close_panels()
 	manager.match_controller.hide_preview()
@@ -141,6 +143,8 @@ func select_rect(rect: Rect2, append: bool = false) -> void:
 	paint()
 func object_input(item: Control, event: InputEvent) -> bool:
 	var id: String = object_id(item)
+	if event is InputEventMouseButton and event.pressed and event.button_index==MOUSE_BUTTON_RIGHT and manager.lab!=null and id in manager.lab.ids():
+		manager.lab.open();manager.lab.menu(ids.duplicate() if ids.has(id) else [id]);return true
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_RIGHT and ids.has(id) and ids.size() > 1:
 			open_bulk(item,event.position)

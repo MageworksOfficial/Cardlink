@@ -1,6 +1,7 @@
 extends RefCounted
 signal changed
 const ACTIONS = {
+	"untap_all":["PLAYTEST: Untap All I Control",KEY_T | KEY_MASK_CTRL | KEY_MASK_ALT,"Gameplay"],
 	"reset_match":["Reset Match",KEY_R | KEY_MASK_CTRL | KEY_MASK_ALT | KEY_MASK_SHIFT,"Gameplay"],
 	"background_edit":["Background Edit Mode",KEY_B | KEY_MASK_CTRL,"View"],
 	"play_top":["Top card to battlefield",KEY_D | KEY_MASK_CTRL,"Gameplay"],

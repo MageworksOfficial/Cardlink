@@ -375,6 +375,7 @@ func move_card(card: Control, kind: String, on_top: bool = true, player_id: Stri
 func assigned_zone(card: Control, zone: Control) -> void:
 	if transitioning:
 		return
+	if card.state.current_zone=="review" and zone!=null and zone.display_name=="PLAYTEST REVIEW" and zone.player_id==card.state.zone_player_id: return
 	if zone != null and zone.zone_type in ["deck","library"]: Knowledge.entering(card.state,visibility)
 	var publicly_revealed: bool = card.state.custom_metadata.get("public_reveal", false)
 	for player: RefCounted in model.players.values():
@@ -452,7 +453,7 @@ func change_life(player_id: String, amount: int) -> void:
 		manager.undo.finish.call_deferred()
 	var previous: int = model.players[player_id].life
 	model.players[player_id].life += amount
-	record_event("life", "%s life: %d → %d" % [model.players[player_id].display_name, previous, model.players[player_id].life], {"player_id": player_id, "before": previous, "after": model.players[player_id].life})
+	record_event("life", "%s life: %d â†’ %d" % [model.players[player_id].display_name, previous, model.players[player_id].life], {"player_id": player_id, "before": previous, "after": model.players[player_id].life})
 	manager.life = model.players.local.life
 	manager.controls.life_label.text = "Life: %d" % manager.life
 	refresh()
@@ -480,7 +481,7 @@ func open_library_view(player_id: String = "local") -> void:
 	inspection_zone = "library"
 	search_player = ""
 	contents_query.text = ""
-	contents.title = player_id.capitalize()+" library · known cards only · order preserved"
+	contents.title = player_id.capitalize()+" library Â· known cards only Â· order preserved"
 	inspection_reveal_button.visible = false
 	refresh_contents()
 	contents.popup_centered_clamped(Vector2i(680,570),0.9)
@@ -508,7 +509,7 @@ func open_inspection(player_id: String, kind: String, reveal: bool = false) -> v
 		for state: RefCounted in states: Knowledge.learn(state,"local")
 	contents_query.text = ""
 	contents_list.get_v_scroll_bar().value = 0
-	contents.title = ("Reveal " if reveal else "Search ") + player_id + " " + kind + " · " + ("shuffles on close" if kind == "library" else "temporary access")
+	contents.title = ("Reveal " if reveal else "Search ") + player_id + " " + kind + " Â· " + ("shuffles on close" if kind == "library" else "temporary access")
 	refresh_contents()
 	contents.popup_centered_clamped(Vector2i(680, 570), 0.9)
 	refresh()
@@ -576,7 +577,7 @@ func refresh() -> void:
 	count.text = "Library: %d" % pile.order.size()
 	count.tooltip_text = deck_name
 	for card: Control in manager.cards:
-		card.state.identity_visible = visibility.can_present(card.state, "local")
+		card.state.identity_visible = visibility.can_present(card.state, active_hand_player() if card.state.current_zone=="review" and playtest.local_playtest() else "local")
 		card.card_back.texture = preload("res://scripts/battle/deck_back.gd").for_card(card,manager.backs)
 		card.card_back.visible = card.state.face_down or not card.state.identity_visible
 		if card.state.is_token:
@@ -644,7 +645,7 @@ func end_turn() -> void:
 	record_event("end_turn", actor_name() + " ended turn")
 	model.active_player = "opponent" if model.active_player == "local" else "local"
 	model.turn_number += 1
-	record_event("turn", "Turn %d — %s" % [model.turn_number, actor_name()])
+	record_event("turn", "Turn %d â€” %s" % [model.turn_number, actor_name()])
 	if manager.perspective != null: manager.perspective.after_turn()
 	manager.refresh_match_summary()
 
@@ -703,7 +704,7 @@ func open_public_zone(player: String, kind: String) -> void:
 	search_player = ""
 	contents_query.text = ""
 	inspection_reveal_button.hide()
-	contents.title = model.players[player].display_name+" · "+kind.capitalize()
+	contents.title = model.players[player].display_name+" Â· "+kind.capitalize()
 	refresh_contents()
 	contents.popup_centered_clamped(Vector2i(680,570),0.9)
 func public_gallery_click(index: int, _point: Vector2, button_index: int) -> void:
